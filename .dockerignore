@@ -1,0 +1,6 @@
+.codex
+.env
+.env.local
+config/
+data/
+

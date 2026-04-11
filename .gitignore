@@ -1,0 +1,9 @@
+.codex
+.env
+GameXishu.json
+GameXishu_*.json
+config/GameXishu.json
+config/GameXishu_*.json
+!config/GameXishu.json.example
+data/*
+!data/.gitkeep

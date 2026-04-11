@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/soulmask/soulmask-server.schema.json",
+  "title": "Soulmask Server Manager Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "compose",
+    "startup"
+  ],
+  "properties": {
+    "compose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "puid",
+        "pgid",
+        "hostDataDir",
+        "hostConfigDir",
+        "publishedPorts"
+      ],
+      "properties": {
+        "puid": {
+          "type": "integer",
+          "minimum": 0,
+          "x-composeEnv": "PUID"
+        },
+        "pgid": {
+          "type": "integer",
+          "minimum": 0,
+          "x-composeEnv": "PGID"
+        },
+        "timezone": {
+          "type": "string",
+          "default": "UTC",
+          "x-composeEnv": "TZ"
+        },
+        "hostDataDir": {
+          "type": "string",
+          "x-composeEnv": "HOST_DATA_DIR"
+        },
+        "hostConfigDir": {
+          "type": "string",
+          "x-composeEnv": "HOST_CONFIG_DIR"
+        },
+        "containerName": {
+          "type": "string",
+          "default": "soulmask",
+          "x-composeEnv": "SOULMASK_CONTAINER_NAME"
+        },
+        "image": {
+          "type": "string",
+          "default": "acekorneya/soul_server",
+          "x-composeEnv": "SOULMASK_IMAGE"
+        },
+        "tag": {
+          "type": "string",
+          "default": "latest",
+          "x-composeEnv": "SOULMASK_TAG"
+        },
+        "restartPolicy": {
+          "type": "string",
+          "enum": [
+            "no",
+            "always",
+            "on-failure",
+            "unless-stopped"
+          ],
+          "default": "unless-stopped",
+          "x-composeEnv": "SOULMASK_RESTART_POLICY"
+        },
+        "autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "x-composeEnv": "AUTO_UPDATE"
+        },
+        "validateOnUpdate": {
+          "type": "boolean",
+          "default": false,
+          "x-composeEnv": "VALIDATE_ON_UPDATE"
+        },
+        "publishedPorts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "game",
+            "query",
+            "rcon"
+          ],
+          "properties": {
+            "game": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "x-composeEnv": "SOULMASK_PUBLISHED_GAME_PORT"
+            },
+            "query": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "x-composeEnv": "SOULMASK_PUBLISHED_QUERY_PORT"
+            },
+            "rcon": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "x-composeEnv": "SOULMASK_PUBLISHED_RCON_PORT"
+            }
+          }
+        }
+      }
+    },
+    "startup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "appId": {
+          "type": "integer",
+          "const": 3017300,
+          "x-containerEnv": "SOULMASK_APP_ID"
+        },
+        "levelName": {
+          "type": "string",
+          "default": "Level01_Main",
+          "examples": [
+            "Level01_Main",
+            "DLC_Level01_Main",
+            "Level01_Main?ND=2"
+          ],
+          "x-serverEnv": "SOULMASK_LEVEL_NAME"
+        },
+        "gameMode": {
+          "type": "string",
+          "enum": [
+            "pve",
+            "pvp"
+          ],
+          "default": "pve",
+          "x-serverEnv": "SOULMASK_GAME_MODE"
+        },
+        "serverName": {
+          "type": "string",
+          "default": "POK Soulmask Server",
+          "x-serverEnv": "SOULMASK_SERVER_NAME"
+        },
+        "serverPassword": {
+          "type": "string",
+          "default": "",
+          "x-serverEnv": "SOULMASK_SERVER_PASSWORD"
+        },
+        "adminPassword": {
+          "type": "string",
+          "default": "AdminChangeMePlease!",
+          "x-serverEnv": "SOULMASK_ADMIN_PASSWORD"
+        },
+        "ports": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "game": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535,
+              "default": 8777,
+              "x-composeEnv": "SOULMASK_GAME_PORT",
+              "x-containerEnv": "SOULMASK_GAME_PORT"
+            },
+            "query": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535,
+              "default": 27015,
+              "x-composeEnv": "SOULMASK_QUERY_PORT",
+              "x-containerEnv": "SOULMASK_QUERY_PORT"
+            },
+            "echo": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 65535,
+              "default": 18888,
+              "x-composeEnv": "SOULMASK_ECHO_PORT",
+              "x-containerEnv": "SOULMASK_ECHO_PORT"
+            },
+            "rcon": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 19000,
+              "x-composeEnv": "SOULMASK_RCON_PORT",
+              "x-containerEnv": "SOULMASK_RCON_PORT"
+            }
+          }
+        },
+        "listenAddress": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "x-serverEnv": "SOULMASK_LISTEN_ADDRESS"
+        },
+        "maxPlayers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 255,
+          "default": 50,
+          "x-serverEnv": "SOULMASK_MAX_PLAYERS"
+        },
+        "saveIntervalSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 600,
+          "x-serverEnv": "SOULMASK_SAVE_INTERVAL_SECONDS"
+        },
+        "backupIntervalSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 900,
+          "x-serverEnv": "SOULMASK_BACKUP_INTERVAL_SECONDS"
+        },
+        "initBackup": {
+          "type": "boolean",
+          "default": false,
+          "x-serverEnv": "SOULMASK_INIT_BACKUP"
+        },
+        "backupIntervalMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 10080,
+          "default": null,
+          "x-serverEnv": "SOULMASK_BACKUP_INTERVAL_MINUTES"
+        },
+        "rconAddress": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_RCON_ADDRESS"
+        },
+        "rconPassword": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_RCON_PASSWORD"
+        },
+        "mods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "default": [],
+          "x-serverEnv": "SOULMASK_MOD_IDS",
+          "x-serialization": "comma-separated"
+        },
+        "serverId": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "default": null,
+          "x-serverEnv": "SOULMASK_SERVER_ID"
+        },
+        "clusterMainServerPort": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 65535,
+          "default": null,
+          "x-serverEnv": "SOULMASK_CLUSTER_MAIN_SERVER_PORT"
+        },
+        "clusterClientServerConnect": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "examples": [
+            "10.0.0.10:29000"
+          ],
+          "x-serverEnv": "SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT"
+        },
+        "coefTemplate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_COEF_TEMPLATE",
+          "x-gameplayFilenameTemplate": "GameXishu_<template>.json"
+        },
+        "tribeMaxMembers": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "default": null,
+          "x-serverEnv": "SOULMASK_TRIBE_MAX_MEMBERS"
+        },
+        "permissionMask": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_PERMISSION_MASK"
+        },
+        "steamBranch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_STEAM_BRANCH"
+        },
+        "steamBetaPassword": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "x-serverEnv": "SOULMASK_STEAM_BETA_PASSWORD"
+        },
+        "logEnabled": {
+          "type": "boolean",
+          "default": true,
+          "x-serverEnv": "SOULMASK_LOG_ENABLED"
+        },
+        "onlineMode": {
+          "type": "string",
+          "default": "Steam",
+          "x-serverEnv": "SOULMASK_ONLINE_MODE"
+        },
+        "extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "x-serverEnv": "SOULMASK_EXTRA_ARGS",
+          "x-serialization": "space-separated"
+        }
+      }
+    },
+    "gameplay": {
+      "type": "object",
+      "description": "Arbitrary GameXishu JSON written to config/GameXishu.json or config/GameXishu_<template>.json and copied into WS/Saved/GameplaySettings on startup.",
+      "additionalProperties": true
+    }
+  }
+}
