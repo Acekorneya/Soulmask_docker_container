@@ -1,6 +1,9 @@
 .codex
 .env
 .env.local
+server_2.env
+schema/
 config/
-data/
-
+GameXishu.json
+instances/
+shared/

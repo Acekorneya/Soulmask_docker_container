@@ -57,6 +57,61 @@ ensure_writable_dir() {
   rm -f "$probe"
 }
 
+seed_gameplay_config_from_example() {
+  local host_config_file="$1"
+  local exact_example_file="${host_config_file}.example"
+  local generic_example_file="$SOULMASK_CONFIG_ROOT_DIR/GameXishu.json.example"
+  local generic_template_example_file=""
+
+  generic_template_example_file="$SOULMASK_CONFIG_ROOT_DIR/$(basename "$host_config_file").example"
+
+  if [[ -f "$host_config_file" ]]; then
+    return
+  fi
+
+  if [[ -f "$exact_example_file" ]]; then
+    cp -f "$exact_example_file" "$host_config_file"
+    log INFO "Seeded gameplay config from $exact_example_file"
+    return
+  fi
+
+  if [[ -f "$generic_template_example_file" ]]; then
+    cp -f "$generic_template_example_file" "$host_config_file"
+    log INFO "Seeded gameplay config from $generic_template_example_file"
+    return
+  fi
+
+  if [[ -f "$generic_example_file" ]]; then
+    cp -f "$generic_example_file" "$host_config_file"
+    log INFO "Seeded gameplay config from $generic_example_file"
+  fi
+}
+
+initialize_minimal_gameplay_config_for_crossplay() {
+  local host_config_file="$1"
+  local crossplay_value="$2"
+
+  if [[ -f "$host_config_file" ]]; then
+    return
+  fi
+
+  cat >"$host_config_file" <<EOF
+{
+  "0": {
+    "KaiQiKuaFu": $crossplay_value
+  },
+  "1": {
+    "KaiQiKuaFu": $crossplay_value
+  },
+  "2": {
+    "KaiQiKuaFu": $crossplay_value
+  }
+}
+EOF
+
+  log WARN "Created a minimal gameplay config at $host_config_file to persist the crossplay toggle"
+}
+
 sync_gameplay_config() {
   local host_config_file="$1"
   local target_config_file="$2"
@@ -76,6 +131,28 @@ sync_gameplay_config() {
   fi
 
   log WARN "No gameplay config found at '$host_config_file' or '$target_config_file'. Allowing the server to generate defaults."
+}
+
+set_crossplay_in_gameplay_config() {
+  local config_file="$1"
+  local crossplay_value="$2"
+  local tmp_file=""
+
+  [[ -f "$config_file" ]] || return 0
+
+  tmp_file="${config_file}.tmp.$$"
+
+  if ! jq --argjson crossplay "$crossplay_value" '
+    .["0"] = ((.["0"] // {}) + {"KaiQiKuaFu": $crossplay}) |
+    .["1"] = ((.["1"] // {}) + {"KaiQiKuaFu": $crossplay}) |
+    .["2"] = ((.["2"] // {}) + {"KaiQiKuaFu": $crossplay})
+  ' "$config_file" >"$tmp_file"; then
+    rm -f "$tmp_file"
+    die "Failed to update KaiQiKuaFu in $config_file"
+  fi
+
+  mv -f "$tmp_file" "$config_file"
+  log INFO "Set KaiQiKuaFu=$crossplay_value in $config_file"
 }
 
 seed_gameplay_config_if_missing() {
@@ -138,6 +215,22 @@ prepare_runtime_identity() {
   export LOGNAME="pokuser"
 }
 
+with_install_lock() {
+  local lock_dir=""
+  local lock_fd=""
+
+  lock_dir="$(dirname "$SOULMASK_INSTALL_LOCK_FILE")"
+  ensure_writable_dir "$lock_dir" "Shared install lock"
+
+  # shellcheck disable=SC3045
+  exec {lock_fd}>"$SOULMASK_INSTALL_LOCK_FILE"
+  flock "$lock_fd"
+  "$@"
+  flock -u "$lock_fd"
+  # shellcheck disable=SC3045
+  exec {lock_fd}>&-
+}
+
 run_with_runtime_identity() {
   if [[ -n "$RUNTIME_IDENTITY_WRAPPER_LIB" ]]; then
     env \
@@ -153,6 +246,7 @@ run_with_runtime_identity() {
   "$@"
 }
 
+# shellcheck disable=SC2317
 install_steamcmd_if_needed() {
   local steamcmd_bin="$SOULMASK_STEAMCMD_DIR/steamcmd.sh"
   local steamcmd_url_primary="https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
@@ -184,6 +278,7 @@ sync_steam_runtime_files() {
   fi
 }
 
+# shellcheck disable=SC2317
 update_server_if_needed() {
   local steamcmd_bin="$SOULMASK_STEAMCMD_DIR/steamcmd.sh"
   local validate_requested=false
@@ -195,6 +290,10 @@ update_server_if_needed() {
   fi
 
   if ! is_true "${AUTO_UPDATE:-true}" && [[ ! -x "$SOULMASK_INSTALL_DIR/WSServer.sh" ]]; then
+    if [[ -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
+      die "AUTO_UPDATE=false but no shared Soulmask install exists at $SOULMASK_INSTALL_DIR. Start the main server first so it can install the game files."
+    fi
+
     die "AUTO_UPDATE=false but no Soulmask install exists at $SOULMASK_INSTALL_DIR"
   fi
 
@@ -255,13 +354,31 @@ wait_for_server_binary() {
   return 1
 }
 
+prepare_server_install() {
+  prepare_shared_install
+  sync_steam_runtime_files
+}
+
+prepare_shared_install() {
+  with_install_lock prepare_shared_install_locked
+}
+
+# shellcheck disable=SC2317
+prepare_shared_install_locked() {
+  install_steamcmd_if_needed
+  update_server_if_needed
+}
+
 SOULMASK_APP_ID="${SOULMASK_APP_ID:-3017300}"
-SOULMASK_DATA_DIR="${SOULMASK_DATA_DIR:-/home/pokuser/soulmask/data}"
-SOULMASK_CONFIG_DIR="${SOULMASK_CONFIG_DIR:-/home/pokuser/soulmask/config}"
-SOULMASK_STEAMCMD_DIR="${SOULMASK_STEAMCMD_DIR:-$SOULMASK_DATA_DIR/steamcmd}"
-SOULMASK_INSTALL_DIR="${SOULMASK_INSTALL_DIR:-$SOULMASK_DATA_DIR/server}"
+SOULMASK_DATA_DIR="${SOULMASK_DATA_DIR:-/home/pokuser/soulmask/instances/server_1}"
+SOULMASK_CONFIG_DIR="${SOULMASK_CONFIG_DIR:-/home/pokuser/soulmask/config/server_1}"
+SOULMASK_SHARED_DIR="${SOULMASK_SHARED_DIR:-/home/pokuser/soulmask/shared}"
+SOULMASK_STEAMCMD_DIR="${SOULMASK_STEAMCMD_DIR:-$SOULMASK_SHARED_DIR/steamcmd}"
+SOULMASK_INSTALL_DIR="${SOULMASK_INSTALL_DIR:-$SOULMASK_SHARED_DIR/server}"
 HOME="${HOME:-$SOULMASK_DATA_DIR/home}"
 export HOME
+SOULMASK_CONFIG_ROOT_DIR="${SOULMASK_CONFIG_ROOT_DIR:-$(dirname "$SOULMASK_CONFIG_DIR")}"
+SOULMASK_INSTALL_LOCK_FILE="${SOULMASK_INSTALL_LOCK_FILE:-$SOULMASK_SHARED_DIR/.install.lock}"
 
 SOULMASK_SERVER_NAME="${SOULMASK_SERVER_NAME:-POK Soulmask Server}"
 SOULMASK_SERVER_PASSWORD="${SOULMASK_SERVER_PASSWORD:-}"
@@ -279,10 +396,13 @@ SOULMASK_BACKUP_INTERVAL_SECONDS="${SOULMASK_BACKUP_INTERVAL_SECONDS:-900}"
 SOULMASK_INIT_BACKUP="${SOULMASK_INIT_BACKUP:-false}"
 SOULMASK_LOG_ENABLED="${SOULMASK_LOG_ENABLED:-true}"
 SOULMASK_ONLINE_MODE="${SOULMASK_ONLINE_MODE:-Steam}"
+SOULMASK_ENABLE_CROSSPLAY="${SOULMASK_ENABLE_CROSSPLAY:-false}"
 
 export SOULMASK_APP_ID
 export SOULMASK_DATA_DIR
 export SOULMASK_CONFIG_DIR
+export SOULMASK_CONFIG_ROOT_DIR
+export SOULMASK_SHARED_DIR
 export SOULMASK_STEAMCMD_DIR
 export SOULMASK_INSTALL_DIR
 
@@ -332,6 +452,18 @@ if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -n "${SOULMASK_CLUSTER_CLIE
   die "Set either SOULMASK_CLUSTER_MAIN_SERVER_PORT or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT, not both"
 fi
 
+if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ "$SOULMASK_GAME_MODE" != "pve" ]]; then
+  die "ENABLE_CROSSPLAY requires SOULMASK_GAME_MODE=pve. PvP cross-map clustering is not supported yet."
+fi
+
+if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -z "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -z "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
+  die "ENABLE_CROSSPLAY=true requires SOULMASK_CLUSTER_MAIN_SERVER_PORT for the main server or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT for a client server."
+fi
+
+if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" || -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]] && [[ "$SOULMASK_GAME_MODE" != "pve" ]]; then
+  die "Cluster settings currently require SOULMASK_GAME_MODE=pve. PvP cross-map clustering is not supported yet."
+fi
+
 if [[ -n "${SOULMASK_RCON_PASSWORD:-}" && -z "${SOULMASK_RCON_ADDRESS:-}" ]]; then
   SOULMASK_RCON_ADDRESS="$SOULMASK_LISTEN_ADDRESS"
 fi
@@ -340,9 +472,7 @@ if [[ -n "${UMASK:-}" ]]; then
   umask "$UMASK"
 fi
 
-install_steamcmd_if_needed
-sync_steam_runtime_files
-update_server_if_needed
+prepare_server_install
 
 GAMEPLAY_FILENAME="GameXishu.json"
 if [[ -n "${SOULMASK_COEF_TEMPLATE:-}" ]]; then
@@ -351,8 +481,24 @@ fi
 
 HOST_GAMEPLAY_CONFIG="$SOULMASK_CONFIG_DIR/$GAMEPLAY_FILENAME"
 TARGET_GAMEPLAY_CONFIG="$SOULMASK_INSTALL_DIR/WS/Saved/GameplaySettings/$GAMEPLAY_FILENAME"
+CROSSPLAY_VALUE=0
+
+if is_true "$SOULMASK_ENABLE_CROSSPLAY"; then
+  CROSSPLAY_VALUE=1
+fi
+
+seed_gameplay_config_from_example "$HOST_GAMEPLAY_CONFIG"
+
+if (( CROSSPLAY_VALUE == 1 )) && [[ ! -f "$HOST_GAMEPLAY_CONFIG" && ! -f "$TARGET_GAMEPLAY_CONFIG" ]]; then
+  initialize_minimal_gameplay_config_for_crossplay "$HOST_GAMEPLAY_CONFIG" "$CROSSPLAY_VALUE"
+fi
 
 sync_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
+
+if [[ -f "$HOST_GAMEPLAY_CONFIG" ]]; then
+  set_crossplay_in_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$CROSSPLAY_VALUE"
+  cp -f "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
+fi
 
 export SteamAppId=2646460
 
@@ -409,11 +555,11 @@ if [[ -n "${SOULMASK_SERVER_ID:-}" ]]; then
   LAUNCH_ARGS+=("-serverid=${SOULMASK_SERVER_ID}")
 fi
 
-if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
+if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
   LAUNCH_ARGS+=("-mainserverport=${SOULMASK_CLUSTER_MAIN_SERVER_PORT}")
 fi
 
-if [[ -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
+if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
   LAUNCH_ARGS+=("-clientserverconnect=${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT}")
 fi
 
@@ -439,6 +585,7 @@ log INFO "Map: $SOULMASK_LEVEL_NAME"
 log INFO "Mode: $SOULMASK_GAME_MODE"
 log INFO "Game port: $SOULMASK_GAME_PORT"
 log INFO "Query port: $SOULMASK_QUERY_PORT"
+log INFO "Crossplay enabled: $([[ "$CROSSPLAY_VALUE" -eq 1 ]] && printf yes || printf no)"
 log INFO "RCON enabled: $([[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && printf yes || printf no)"
 
 SOULMASK_LAUNCHER_PID=""

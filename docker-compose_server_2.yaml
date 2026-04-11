@@ -1,24 +1,29 @@
 services:
-  soulmask:
-    container_name: ${SOULMASK_CONTAINER_NAME:-soulmask}
+  soulmask_server_2:
+    container_name: ${SOULMASK_SERVER_2_CONTAINER_NAME:-soulmask-server-2}
     image: ${SOULMASK_IMAGE:-acekorneya/soul_server}:${SOULMASK_TAG:-latest}
     user: "${PUID:-1000}:${PGID:-1000}"
     restart: ${SOULMASK_RESTART_POLICY:-unless-stopped}
     env_file:
       - ./.env
+      - ./server_2.env
     environment:
-      HOME: /home/pokuser/soulmask/instances/server_1/home
+      HOME: /home/pokuser/soulmask/instances/server_2/home
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
-      SOULMASK_CONFIG_DIR: /home/pokuser/soulmask/config/server_1
+      SOULMASK_CONFIG_DIR: /home/pokuser/soulmask/config/server_2
       SOULMASK_CONFIG_ROOT_DIR: /home/pokuser/soulmask/config
-      SOULMASK_DATA_DIR: /home/pokuser/soulmask/instances/server_1
+      SOULMASK_DATA_DIR: /home/pokuser/soulmask/instances/server_2
       SOULMASK_ENABLE_CROSSPLAY: ${ENABLE_CROSSPLAY:-false}
+      SOULMASK_GAME_PORT: "8777"
+      SOULMASK_QUERY_PORT: "27015"
+      SOULMASK_ECHO_PORT: "18888"
+      SOULMASK_RCON_PORT: "19000"
       SOULMASK_INSTALL_DIR: /home/pokuser/soulmask/shared/server
       SOULMASK_SHARED_DIR: /home/pokuser/soulmask/shared
       SOULMASK_STEAMCMD_DIR: /home/pokuser/soulmask/shared/steamcmd
-      SOULMASK_SERVER_ID: "1"
-      SOULMASK_CLUSTER_MAIN_SERVER_PORT: ${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}
+      SOULMASK_SERVER_ID: "2"
+      SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT: soulmask-main:${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-29000}
       TZ: ${TZ:-UTC}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'WSServer-Linux|WSServer.sh' >/dev/null || exit 1"]
@@ -26,16 +31,12 @@ services:
       timeout: 10s
       retries: 5
       start_period: 180s
-    expose:
-      - "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-29000}"
     ports:
-      - "${SOULMASK_PUBLISHED_GAME_PORT:-8777}:${SOULMASK_GAME_PORT:-8777}/udp"
-      - "${SOULMASK_PUBLISHED_QUERY_PORT:-27015}:${SOULMASK_QUERY_PORT:-27015}/udp"
-      - "${SOULMASK_PUBLISHED_RCON_PORT:-19000}:${SOULMASK_RCON_PORT:-19000}/tcp"
+      - "${SOULMASK_SERVER_2_PUBLISHED_GAME_PORT:-8778}:8777/udp"
+      - "${SOULMASK_SERVER_2_PUBLISHED_QUERY_PORT:-27016}:27015/udp"
+      - "${SOULMASK_SERVER_2_PUBLISHED_RCON_PORT:-19001}:19000/tcp"
     networks:
-      soulmask_cluster:
-        aliases:
-          - soulmask-main
+      soulmask_cluster: {}
     stop_grace_period: 120s
     volumes:
       - type: bind
@@ -45,16 +46,13 @@ services:
         source: ${HOST_CONFIG_ROOT_DIR:-./config}
         target: /home/pokuser/soulmask/config
       - type: bind
-        source: ${HOST_INSTANCE_DIR:-./instances/server_1}
-        target: /home/pokuser/soulmask/instances/server_1
+        source: ${HOST_SERVER_2_INSTANCE_DIR:-./instances/server_2}
+        target: /home/pokuser/soulmask/instances/server_2
       - type: bind
-        source: ${HOST_INSTANCE_DIR:-./instances/server_1}/saved
+        source: ${HOST_SERVER_2_INSTANCE_DIR:-./instances/server_2}/saved
         target: /home/pokuser/soulmask/shared/server/WS/Saved
 
 networks:
   soulmask_cluster:
-    driver: bridge
+    external: true
     name: ${SOULMASK_CLUSTER_NETWORK_NAME:-soulmask-cluster}
-    ipam:
-      config:
-        - subnet: ${SOULMASK_CLUSTER_SUBNET:-172.29.0.0/24}

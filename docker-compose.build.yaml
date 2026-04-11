@@ -1,6 +1,0 @@
-services:
-  soulmask:
-    build:
-      context: .
-      dockerfile: Dockerfile
-

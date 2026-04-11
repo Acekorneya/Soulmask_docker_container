@@ -13,18 +13,20 @@ RUN dpkg --add-architecture i386 \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        jq \
         lib32gcc-s1 \
         libnss-wrapper \
         locales \
         procps \
         tini \
+        util-linux \
     && sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && locale-gen \
     && groupadd -g "${POKUSER_GID}" pokuser \
     && useradd -m -u "${POKUSER_UID}" -g "${POKUSER_GID}" -s /bin/bash pokuser \
-    && mkdir -p /home/pokuser/soulmask/data /home/pokuser/soulmask/config \
+    && mkdir -p /home/pokuser/soulmask/config /home/pokuser/soulmask/instances /home/pokuser/soulmask/shared \
     && chown -R "${POKUSER_UID}:${POKUSER_GID}" /home/pokuser \
-    && chmod 1777 /home/pokuser/soulmask/data /home/pokuser/soulmask/config \
+    && chmod 1777 /home/pokuser/soulmask/config /home/pokuser/soulmask/instances /home/pokuser/soulmask/shared \
     && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

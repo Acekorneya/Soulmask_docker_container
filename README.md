@@ -1,118 +1,214 @@
 # Soulmask Docker Container
 
-Linux-native Soulmask dedicated server container for Steam app `3017300`, designed for two consumers:
+Linux-native Soulmask dedicated server container for Steam app `3017300`.
 
-- `docker-compose.yaml` for direct self-hosted use
-- a future Rust backend + React frontend manager that renders the same Compose and config contract
+This repo is meant to be easy to run in two ways:
 
-The image includes a non-root user named `pokuser`. Compose still sets `user: "${PUID}:${PGID}"` so host volume ownership stays correct, and the entrypoint uses `libnss_wrapper` to map the active numeric UID:GID to the username `pokuser` inside the container.
+1. Single server with `docker-compose.yaml`
+2. Two-map PvE cluster with `docker-compose.yaml` plus `docker-compose_server_2.yaml`
 
-## Layout
+The image includes a non-root user named `pokuser`. Compose still runs with `user: "${PUID}:${PGID}"` so bind-mounted files stay owned by the Linux user you choose on the host.
+
+## Repo Layout
 
 ```text
 .
 ├── Dockerfile
 ├── docker-compose.yaml
-├── docker-compose.build.yaml
+├── docker-compose_server_2.yaml
 ├── entrypoint.sh
-├── .env
+├── .env.example
+├── server_2.env.example
 ├── config/
-│   └── GameXishu.json.example
-├── data/
-└── schema/
-    └── soulmask-server.schema.json
+│   ├── GameXishu.json.example
+│   ├── server_1/
+│   └── server_2/
+├── instances/
+│   ├── server_1/
+│   └── server_2/
+└── shared/
 ```
 
-## Quick Start
+## Single Server
 
-This repo supports two workflows:
+Use this when you only want one Soulmask server.
 
-- Publisher workflow: you build and push `acekorneya/soul_server`
-- Consumer workflow: users only get the Compose file, `.env`, and `config/`, then pull and run the published image
+### 1. Prepare the config
 
-The main `docker-compose.yaml` is intentionally runtime-only. It pulls `acekorneya/soul_server` and is the same contract the future manager should use.
+```bash
+cp .env.example .env
+```
 
-1. Review `.env` and set both the host wiring values and the server startup values you care about.
-2. Leave `config/GameXishu.json` alone unless you want advanced gameplay tuning later.
-3. Pull and start the container with `docker compose pull && docker compose up -d`.
-4. Inspect logs with `docker compose logs -f soulmask`.
+Edit `.env` and set at least:
 
-Keep `.env` in the same directory as `docker-compose.yaml` unless you explicitly pass `--env-file`. Compose does not auto-read `config/.env`.
+- `PUID` and `PGID`
+- `TZ`
+- `SOULMASK_ADMIN_PASSWORD`
+- `SOULMASK_SERVER_NAME`
+- `SOULMASK_LEVEL_NAME`
+- optional published ports if you do not want the defaults
 
-The first boot downloads SteamCMD and the Soulmask Linux dedicated server into `./data`, so later restarts reuse the same files and world state.
+For a normal single server, leave:
 
-The process still runs with the numeric UID:GID from `.env`, but inside the container the username resolves to `pokuser` regardless of which `PUID` and `PGID` you set.
+- `ENABLE_CROSSPLAY=false`
+- `SOULMASK_GAME_MODE=pve` or `pvp`, whichever you want
 
-The runtime identity wrapper is applied only to the game process, not to SteamCMD bootstrap/update steps. That keeps the `pokuser` identity visible to the dedicated server while avoiding noisy preload warnings from 32-bit SteamCMD.
+### 2. Start the server
 
-`.env` supports comment lines beginning with `#`, and this repo includes annotated comments directly in `.env` and `.env.example` so users can understand each setting without opening the Compose file.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-## Persistence
+Docker creates the needed runtime folders under `./shared`, `./config`, and `./instances/server_1` on first start.
 
-`./data` is the writable host mount used for:
+### 3. Watch logs
 
-- SteamCMD bootstrap files
-- Soulmask server install
-- `WS/Saved` data, including world saves and backups
-- runtime home directory used by Steam
+```bash
+docker compose logs -f soulmask
+```
 
-`./config` is the manager-facing mount used for:
+### 4. Stop the server
 
-- `GameXishu.json` for gameplay settings
-- `GameXishu_<template>.json` when `SOULMASK_COEF_TEMPLATE` is set
+```bash
+docker compose down
+```
 
-The entrypoint copies the host gameplay file into the server tree before launch. If the host gameplay file is missing but the server already has one, the container seeds the host file once and then stops overwriting it.
+## Two-Map PvE Cluster
 
-## Configuration Contract
+Use this when you want one server for `Level01_Main` and one server for `DLC_Level01_Main`, with character transfer between them.
 
-`.env` is the only file normal users should edit. It contains both Compose wiring and Soulmask startup flags:
+Cluster mode in this project is intentionally `pve`-only right now.
 
-- `PUID`, `PGID`
-- host bind mount paths
-- image name and tag
-- restart policy
-- published ports
-- the internal game, query, echo, and RCON ports
-- `AUTO_UPDATE` and `VALIDATE_ON_UPDATE`
-- server and admin passwords
-- map and game mode
-- max players
-- save and backup intervals
-- RCON settings
-- mods
-- cluster settings
-- template selection and extra args
+### What users edit
 
-`config/GameXishu.json` is optional and is only for deeper gameplay settings. It is the canonical gameplay settings file unless `SOULMASK_COEF_TEMPLATE` is set, in which case the canonical filename becomes `config/GameXishu_<template>.json`.
+- `.env` controls server 1 and shared cluster settings
+- `server_2.env` controls server 2 only
 
-## Manager Mapping
+You do not need to manually set:
 
-The later Rust manager should treat [`schema/soulmask-server.schema.json`](schema/soulmask-server.schema.json) as the source of truth and render:
+- `SOULMASK_SERVER_ID`
+- `SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT`
 
-- `.env`
-- `config/GameXishu*.json`
-- `docker-compose.yaml`
+The compose files handle that automatically.
 
-Important mappings:
+### 1. Prepare the config files
 
-- `compose.puid` -> `PUID`
-- `compose.pgid` -> `PGID`
-- `compose.hostDataDir` -> `HOST_DATA_DIR`
-- `compose.hostConfigDir` -> `HOST_CONFIG_DIR`
-- `compose.publishedPorts.*` -> `SOULMASK_PUBLISHED_*`
-- `startup.*` -> `SOULMASK_*`
-- `gameplay` -> `config/GameXishu*.json`
+```bash
+cp .env.example .env
+cp server_2.env.example server_2.env
+```
 
-`startup.mods` is serialized as a comma-separated string into `SOULMASK_MOD_IDS`.
+### 2. Edit `.env`
 
-`startup.extraArgs` is serialized as a space-separated string into `SOULMASK_EXTRA_ARGS`. Keep those values shell-safe because they are appended as raw flags.
+Set these values for the cluster:
 
-## Notes
+- `ENABLE_CROSSPLAY=true`
+- `SOULMASK_GAME_MODE=pve`
+- `SOULMASK_CLUSTER_MAIN_SERVER_PORT=29000` or another free port
+- `SOULMASK_SERVER_PASSWORD=` and keep the same password for both maps if you use one
+- `SOULMASK_SERVER_NAME`
+- `SOULMASK_LEVEL_NAME`
 
-- The container uses bridge networking with explicit port mappings instead of host networking.
-- `SOULMASK_ECHO_PORT` is still passed to the server, but the telnet listener is not published by default because Soulmask binds it locally.
-- If `AUTO_UPDATE=false`, the container skips SteamCMD updates and expects an existing install under `./data/server`.
-- `VALIDATE_ON_UPDATE=true` is supported, but disabled by default because it slows normal restarts.
+Server 1 is the main cluster node. It can use either map:
+
+- `SOULMASK_LEVEL_NAME=Level01_Main`
+- `SOULMASK_LEVEL_NAME=DLC_Level01_Main`
+
+### 3. Edit `server_2.env`
+
+Set the second server to the opposite map from server 1:
+
+- if server 1 uses `Level01_Main`, set server 2 to `DLC_Level01_Main`
+- if server 1 uses `DLC_Level01_Main`, set server 2 to `Level01_Main`
+
+You can also change:
+
+- `SOULMASK_SERVER_NAME`
+- server 2 optional gameplay overrides
+
+Server 2 already defaults to `AUTO_UPDATE=false` so it reuses the shared install instead of updating it directly.
+
+### 4. Start server 1 first
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+### 5. Start server 2 second
+
+```bash
+docker compose -f docker-compose_server_2.yaml pull
+docker compose -f docker-compose_server_2.yaml up -d
+```
+
+Docker creates the server 2 runtime folders under `./instances/server_2` on first start.
+
+### 6. Watch logs
+
+```bash
+docker compose logs -f soulmask
+docker compose -f docker-compose_server_2.yaml logs -f soulmask_server_2
+```
+
+### 7. Stop in reverse order
+
+```bash
+docker compose -f docker-compose_server_2.yaml down
+docker compose down
+```
+
+## How The Cluster Works
+
+- `docker-compose.yaml` is server 1 and the main cluster node
+- `docker-compose_server_2.yaml` is server 2 and the client node
+- server 2 automatically connects to server 1 through the Docker network alias `soulmask-main`
+- both containers share one SteamCMD directory and one game install in `./shared`
+- each container keeps its own runtime files and save data in its own `./instances/server_X` folder
+
+That means the game files download once, but each map keeps separate saves.
+
+## Storage
+
+`./shared` stores:
+
+- the shared SteamCMD files
+- the shared Soulmask server install
+- the shared install/update lock
+
+`./instances/server_1` and `./instances/server_2` store:
+
+- per-instance runtime home
+- logs
+- per-instance `WS/Saved` data
+
+`./config` stores:
+
+- `config/server_1/GameXishu.json`
+- `config/server_2/GameXishu.json`
+- `config/GameXishu.json.example`
+
+If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it from the example file when possible.
+
+## Crossplay Toggle
+
+Soulmask 1.0 stores `KaiQiKuaFu` in sections `"0"`, `"1"`, and `"2"` of `GameXishu.json`.
+
+The container keeps that in sync automatically:
+
+- `ENABLE_CROSSPLAY=true` writes `KaiQiKuaFu=1`
+- `ENABLE_CROSSPLAY=false` writes `KaiQiKuaFu=0`
+
+Users do not need to edit the JSON by hand just to enable cluster transfers.
+
+## Important Cluster Rules
+
+- Cluster mode is `pve`-only in this project right now
+- start server 1 before server 2
+- stop server 2 before server 1
+- use different maps on server 1 and server 2
+- use the same server password on both nodes if you want the smoothest transfer flow
 
 ## Build And Push
 
@@ -123,16 +219,4 @@ docker build -t acekorneya/soul_server:latest /home/factorioserver/Soul_Docker
 docker push acekorneya/soul_server:latest
 ```
 
-For local image development with Compose instead of raw `docker build`, use:
-
-```bash
-docker compose -f docker-compose.yaml -f docker-compose.build.yaml build soulmask
-```
-
-For end users and the future manager, keep `SOULMASK_IMAGE=acekorneya/soul_server` and `SOULMASK_TAG=latest`, then run:
-
-```bash
-docker compose pull
-docker compose up -d
-docker compose logs -f soulmask
-```
+Normal users only need the compose files, env templates, and this README.
