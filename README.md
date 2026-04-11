@@ -2,6 +2,8 @@
 
 Linux-native Soulmask dedicated server container for Steam app `3017300`.
 
+License: Apache-2.0. Attribution to `POK` must be preserved through the included [NOTICE](/mnt/j/Coding_980/Soulmask_docker_container/NOTICE) file when redistributing this project or derivatives.
+
 This repo is meant to be easy to run in two ways:
 
 1. Single server with `docker-compose.yaml`
@@ -194,13 +196,13 @@ If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it f
 
 ## RCON / Admin CLI
 
-If you set `SOULMASK_RCON_PASSWORD`, the image includes a built-in `soulmask-rcon` client that the container manager can call with `docker exec`.
+If you set `SOULMASK_RCON_PASSWORD`, the image includes a built-in `soulmask-rcon` client that you can call with `docker exec`.
 
 Recommended setup:
 
 - leave `SOULMASK_RCON_ADDRESS=` blank
 - set `SOULMASK_RCON_PASSWORD` to enable RCON
-- use `docker exec` to run commands from the host or from a future manager
+- use `docker exec` to run commands from the host
 
 That keeps RCON bound to `127.0.0.1` inside the container by default instead of exposing it broadly on the network.
 
@@ -258,7 +260,7 @@ The world save file used for timestamp checks is:
 
 The image now includes a built-in health probe at `soulmask-health`.
 
-Docker uses that same probe for the container `healthcheck`, so a future manager can rely on normal Docker health status instead of inventing a second health system.
+Docker uses that same probe for the container `healthcheck`, so Docker health status and the direct probe stay aligned.
 
 What the probe checks:
 
@@ -271,7 +273,7 @@ What the probe checks:
 - the RCON TCP port is listening when RCON is enabled
 - the internal cluster main TCP port is listening on server 1 when cluster mode is enabled
 
-Manager-friendly commands:
+Useful commands:
 
 ```bash
 docker inspect --format '{{.State.Health.Status}}' soulmask
@@ -286,7 +288,7 @@ docker inspect --format '{{.State.Health.Status}}' soulmask-server-2
 docker exec soulmask-server-2 soulmask-health
 ```
 
-That gives the manager two layers:
+That gives you two layers:
 
 - quick status from Docker: `healthy`, `starting`, or `unhealthy`
 - detailed failure reason from `soulmask-health`
@@ -315,7 +317,7 @@ Users do not need to edit the JSON by hand just to enable cluster transfers.
 
 The authoritative command list is `help` from the running server, because command names and aliases can change between builds.
 
-Common commands used by managers and admins include:
+Common admin commands include:
 
 - `help`
 - `saveworld 1`
