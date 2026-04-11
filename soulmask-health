@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+fail() {
+  printf 'unhealthy: %s\n' "$*" >&2
+  exit 1
+}
+
+is_true() {
+  case "${1:-false}" in
+    1|[Tt][Rr][Uu][Ee]|[Yy][Ee][Ss]|[Oo][Nn])
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+port_hex() {
+  printf '%04X' "$1"
+}
+
+udp_port_listening() {
+  local port="$1"
+  local port_hex_value=""
+
+  port_hex_value="$(port_hex "$port")"
+
+  awk -v port=":$port_hex_value" '
+    BEGIN {
+      found = 0
+    }
+    {
+      local_port = toupper($2)
+      if (local_port ~ port "$") {
+        found = 1
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  ' /proc/net/udp /proc/net/udp6
+}
+
+tcp_port_listening() {
+  local port="$1"
+  local port_hex_value=""
+
+  port_hex_value="$(port_hex "$port")"
+
+  awk -v port=":$port_hex_value" '
+    BEGIN {
+      found = 0
+    }
+    {
+      local_port = toupper($2)
+      state = toupper($4)
+      if (local_port ~ port "$" && state == "0A") {
+        found = 1
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  ' /proc/net/tcp /proc/net/tcp6
+}
+
+SOULMASK_INSTALL_DIR="${SOULMASK_INSTALL_DIR:-/home/pokuser/soulmask/shared/server}"
+SOULMASK_GAME_PORT="${SOULMASK_GAME_PORT:-8777}"
+SOULMASK_QUERY_PORT="${SOULMASK_QUERY_PORT:-27015}"
+SOULMASK_ECHO_PORT="${SOULMASK_ECHO_PORT:-18888}"
+SOULMASK_RCON_PORT="${SOULMASK_RCON_PORT:-19000}"
+SOULMASK_ENABLE_CLUSTER="${SOULMASK_ENABLE_CLUSTER:-${ENABLE_CLUSTER:-${SOULMASK_ENABLE_CROSSPLAY:-${ENABLE_CROSSPLAY:-false}}}}"
+
+if ! pgrep -f 'WSServer-Linux' >/dev/null; then
+  fail "WSServer-Linux is not running"
+fi
+
+if [[ ! -x "$SOULMASK_INSTALL_DIR/WSServer.sh" ]]; then
+  fail "Install directory is missing WSServer.sh at $SOULMASK_INSTALL_DIR"
+fi
+
+if [[ ! -d "$SOULMASK_INSTALL_DIR/WS/Saved" ]]; then
+  fail "Expected save directory is missing at $SOULMASK_INSTALL_DIR/WS/Saved"
+fi
+
+if ! udp_port_listening "$SOULMASK_GAME_PORT"; then
+  fail "Game UDP port $SOULMASK_GAME_PORT is not listening"
+fi
+
+if ! udp_port_listening "$SOULMASK_QUERY_PORT"; then
+  fail "Query UDP port $SOULMASK_QUERY_PORT is not listening"
+fi
+
+if ! tcp_port_listening "$SOULMASK_ECHO_PORT"; then
+  fail "Echo TCP port $SOULMASK_ECHO_PORT is not listening"
+fi
+
+if [[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && ! tcp_port_listening "$SOULMASK_RCON_PORT"; then
+  fail "RCON TCP port $SOULMASK_RCON_PORT is not listening"
+fi
+
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
+  if ! tcp_port_listening "$SOULMASK_CLUSTER_MAIN_SERVER_PORT"; then
+    fail "Cluster main TCP port $SOULMASK_CLUSTER_MAIN_SERVER_PORT is not listening"
+  fi
+fi
+
+printf 'healthy: process and expected sockets are ready\n'

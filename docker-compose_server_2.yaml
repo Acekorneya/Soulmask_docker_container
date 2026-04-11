@@ -25,7 +25,7 @@ services:
       SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT: soulmask-main:29000
       TZ: ${TZ:-UTC}
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'WSServer-Linux|WSServer.sh' >/dev/null || exit 1"]
+      test: ["CMD", "/usr/local/bin/soulmask-health"]
       interval: 30s
       timeout: 10s
       retries: 5

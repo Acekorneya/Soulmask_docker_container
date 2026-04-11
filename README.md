@@ -227,6 +227,43 @@ SOULMASK_RCON_ADDRESS=0.0.0.0
 
 and make sure you also restrict access with the Soulmask RCON IP whitelist.
 
+## Health Monitoring
+
+The image now includes a built-in health probe at `soulmask-health`.
+
+Docker uses that same probe for the container `healthcheck`, so a future manager can rely on normal Docker health status instead of inventing a second health system.
+
+What the probe checks:
+
+- `WSServer-Linux` is running
+- the shared install still exists
+- the expected `WS/Saved` path exists
+- the game UDP port is listening
+- the query UDP port is listening
+- the Echo TCP port is listening
+- the RCON TCP port is listening when RCON is enabled
+- the internal cluster main TCP port is listening on server 1 when cluster mode is enabled
+
+Manager-friendly commands:
+
+```bash
+docker inspect --format '{{.State.Health.Status}}' soulmask
+docker inspect --format '{{range .State.Health.Log}}{{println .Output}}{{end}}' soulmask
+docker exec soulmask soulmask-health
+```
+
+For server 2:
+
+```bash
+docker inspect --format '{{.State.Health.Status}}' soulmask-server-2
+docker exec soulmask-server-2 soulmask-health
+```
+
+That gives the manager two layers:
+
+- quick status from Docker: `healthy`, `starting`, or `unhealthy`
+- detailed failure reason from `soulmask-health`
+
 ## Cluster Toggle
 
 Soulmask 1.0 stores `KaiQiKuaFu` in sections `"0"`, `"1"`, and `"2"` of `GameXishu.json`.
