@@ -354,6 +354,100 @@ wait_for_server_binary() {
   return 1
 }
 
+world_db_path() {
+  local map_name="${SOULMASK_LEVEL_NAME%%\?*}"
+  printf "%s\n" "$SOULMASK_INSTALL_DIR/WS/Saved/Worlds/Dedicated/$map_name/world.db"
+}
+
+world_db_mtime() {
+  local world_db="$1"
+
+  if [[ -f "$world_db" ]]; then
+    stat -c %Y "$world_db" 2>/dev/null || true
+  fi
+}
+
+wait_for_world_db_save() {
+  local world_db="$1"
+  local before_mtime="${2:-}"
+  local wait_seconds="$3"
+  local waited=0
+  local current_mtime=""
+
+  while (( waited < wait_seconds )); do
+    current_mtime="$(world_db_mtime "$world_db")"
+
+    if [[ -n "$current_mtime" ]]; then
+      if [[ -z "$before_mtime" || "$current_mtime" != "$before_mtime" ]]; then
+        log INFO "Detected world save update at $world_db (mtime $current_mtime)"
+        return 0
+      fi
+    fi
+
+    sleep 1
+    (( waited += 1 ))
+  done
+
+  return 1
+}
+
+maintenance_command() {
+  local command=("$@")
+
+  if ! [[ -x /usr/local/bin/soulmask-maint ]]; then
+    return 1
+  fi
+
+  /usr/local/bin/soulmask-maint "${command[@]}"
+}
+
+graceful_server_shutdown() {
+  local world_db=""
+  local before_mtime=""
+  local shutdown_delay="${SOULMASK_SHUTDOWN_DELAY_SECONDS:-30}"
+  local save_wait="${SOULMASK_SAVEWORLD_WAIT_SECONDS:-30}"
+
+  if [[ -z "$SERVER_BINARY_PID" ]] || ! kill -0 "$SERVER_BINARY_PID" 2>/dev/null; then
+    return 1
+  fi
+
+  world_db="$(world_db_path)"
+  before_mtime="$(world_db_mtime "$world_db")"
+
+  if maintenance_command saveworld 1; then
+    log INFO "Requested saveworld 1 through the maintenance port"
+
+    if wait_for_world_db_save "$world_db" "$before_mtime" "$save_wait"; then
+      log INFO "World save completed before shutdown"
+    else
+      log WARN "Did not observe a world.db timestamp change within ${save_wait}s at $world_db"
+    fi
+  else
+    log WARN "Failed to send saveworld 1 through the maintenance port"
+  fi
+
+  if maintenance_command quit "$shutdown_delay"; then
+    log INFO "Requested quit $shutdown_delay through the maintenance port"
+    return 0
+  fi
+
+  log WARN "Failed to send quit through the maintenance port"
+  return 1
+}
+
+direct_signal_shutdown() {
+  if [[ -n "$SERVER_BINARY_PID" ]] && kill -0 "$SERVER_BINARY_PID" 2>/dev/null; then
+    log INFO "Forwarding SIGINT to WSServer-Linux pid $SERVER_BINARY_PID"
+    kill -INT "$SERVER_BINARY_PID" 2>/dev/null || true
+    return
+  fi
+
+  if [[ -n "$SOULMASK_LAUNCHER_PID" ]] && kill -0 "$SOULMASK_LAUNCHER_PID" 2>/dev/null; then
+    log INFO "Forwarding SIGTERM to WSServer.sh pid $SOULMASK_LAUNCHER_PID"
+    kill -TERM "$SOULMASK_LAUNCHER_PID" 2>/dev/null || true
+  fi
+}
+
 prepare_server_install() {
   prepare_shared_install
   sync_steam_runtime_files
@@ -393,6 +487,8 @@ SOULMASK_MAX_PLAYERS="${SOULMASK_MAX_PLAYERS:-50}"
 SOULMASK_LISTEN_ADDRESS="${SOULMASK_LISTEN_ADDRESS:-0.0.0.0}"
 SOULMASK_SAVE_INTERVAL_SECONDS="${SOULMASK_SAVE_INTERVAL_SECONDS:-600}"
 SOULMASK_BACKUP_INTERVAL_SECONDS="${SOULMASK_BACKUP_INTERVAL_SECONDS:-900}"
+SOULMASK_SHUTDOWN_DELAY_SECONDS="${SOULMASK_SHUTDOWN_DELAY_SECONDS:-30}"
+SOULMASK_SAVEWORLD_WAIT_SECONDS="${SOULMASK_SAVEWORLD_WAIT_SECONDS:-30}"
 SOULMASK_INIT_BACKUP="${SOULMASK_INIT_BACKUP:-false}"
 SOULMASK_LOG_ENABLED="${SOULMASK_LOG_ENABLED:-true}"
 SOULMASK_ONLINE_MODE="${SOULMASK_ONLINE_MODE:-Steam}"
@@ -431,6 +527,8 @@ require_integer_in_range "SOULMASK_RCON_PORT" "$SOULMASK_RCON_PORT" 1 65535
 require_integer_in_range "SOULMASK_MAX_PLAYERS" "$SOULMASK_MAX_PLAYERS" 1 255
 require_integer_in_range "SOULMASK_SAVE_INTERVAL_SECONDS" "$SOULMASK_SAVE_INTERVAL_SECONDS" 1 86400
 require_integer_in_range "SOULMASK_BACKUP_INTERVAL_SECONDS" "$SOULMASK_BACKUP_INTERVAL_SECONDS" 1 86400
+require_integer_in_range "SOULMASK_SHUTDOWN_DELAY_SECONDS" "$SOULMASK_SHUTDOWN_DELAY_SECONDS" 1 600
+require_integer_in_range "SOULMASK_SAVEWORLD_WAIT_SECONDS" "$SOULMASK_SAVEWORLD_WAIT_SECONDS" 1 600
 
 if [[ -n "${SOULMASK_BACKUP_INTERVAL_MINUTES:-}" ]]; then
   require_integer_in_range "SOULMASK_BACKUP_INTERVAL_MINUTES" "$SOULMASK_BACKUP_INTERVAL_MINUTES" 1 10080
@@ -586,19 +684,25 @@ log INFO "RCON enabled: $([[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && printf yes |
 
 SOULMASK_LAUNCHER_PID=""
 SERVER_BINARY_PID=""
+SHUTDOWN_REQUESTED=0
 
 # shellcheck disable=SC2317
 forward_shutdown() {
-  if [[ -n "$SERVER_BINARY_PID" ]] && kill -0 "$SERVER_BINARY_PID" 2>/dev/null; then
-    log INFO "Forwarding SIGINT to WSServer-Linux pid $SERVER_BINARY_PID"
-    kill -INT "$SERVER_BINARY_PID" 2>/dev/null || true
+  if (( SHUTDOWN_REQUESTED != 0 )); then
+    log WARN "Received another shutdown signal while shutdown is already in progress"
+    direct_signal_shutdown
     return
   fi
 
-  if [[ -n "$SOULMASK_LAUNCHER_PID" ]] && kill -0 "$SOULMASK_LAUNCHER_PID" 2>/dev/null; then
-    log INFO "Forwarding SIGTERM to WSServer.sh pid $SOULMASK_LAUNCHER_PID"
-    kill -TERM "$SOULMASK_LAUNCHER_PID" 2>/dev/null || true
+  SHUTDOWN_REQUESTED=1
+  log INFO "Shutdown signal received. Requesting graceful world save before stop."
+
+  if graceful_server_shutdown; then
+    return
   fi
+
+  log WARN "Falling back to direct process signal shutdown"
+  direct_signal_shutdown
 }
 
 trap forward_shutdown TERM INT

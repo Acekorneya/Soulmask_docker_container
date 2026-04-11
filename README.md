@@ -208,8 +208,6 @@ Examples:
 
 ```bash
 docker exec -it soulmask soulmask-rcon help
-docker exec -it soulmask soulmask-rcon saveworld 1
-docker exec -it soulmask soulmask-rcon shutdown 60
 docker exec -it soulmask soulmask-rcon --interactive
 ```
 
@@ -226,6 +224,35 @@ SOULMASK_RCON_ADDRESS=0.0.0.0
 ```
 
 and make sure you also restrict access with the Soulmask RCON IP whitelist.
+
+## Graceful Shutdown
+
+Container shutdown now uses Soulmask's maintenance port before falling back to process signals.
+
+On `docker compose down` or a normal Docker stop:
+
+1. the entrypoint sends `saveworld 1`
+2. it waits for `world.db` to advance when possible
+3. it sends `quit <seconds>`
+4. if maintenance-port shutdown fails, it falls back to the direct process signal path
+
+The defaults are in [.env.example](/mnt/j/Coding_980/Soulmask_docker_container/.env.example):
+
+- `SOULMASK_SHUTDOWN_DELAY_SECONDS=30`
+- `SOULMASK_SAVEWORLD_WAIT_SECONDS=30`
+
+The maintenance client is also available directly:
+
+```bash
+docker exec -it soulmask soulmask-maint help
+docker exec -it soulmask soulmask-maint saveworld 1
+docker exec -it soulmask soulmask-maint quit 30
+```
+
+The world save file used for timestamp checks is:
+
+- `WS/Saved/Worlds/Dedicated/Level01_Main/world.db`
+- `WS/Saved/Worlds/Dedicated/DLC_Level01_Main/world.db`
 
 ## Health Monitoring
 
@@ -301,3 +328,16 @@ Common commands used by managers and admins include:
 - `lc` to list coefficient values
 - `sc <name> <value>` to change a coefficient
 - `Update_RconClientAddress 1 <ip>` to add an RCON-safe IP temporarily
+
+## Common Maintenance Port Commands
+
+These are the official Soulmask maintenance-port commands used by the shutdown path:
+
+- `help`
+- `saveworld 1`
+- `quit 30`
+
+Sources:
+
+- Soulmask wiki maintenance port docs: https://soulmask.fandom.com/wiki/Private_Server
+- Nitrado save path docs: https://server.nitrado.net/en-US/guides/how-to-upload-a-local-soulmask-save-to-your-nitrado-server
