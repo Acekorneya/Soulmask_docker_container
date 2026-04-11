@@ -192,6 +192,41 @@ That means the game files download once, but each map keeps separate saves.
 
 If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it from the example file when possible.
 
+## RCON / Admin CLI
+
+If you set `SOULMASK_RCON_PASSWORD`, the image includes a built-in `soulmask-rcon` client that the container manager can call with `docker exec`.
+
+Recommended setup:
+
+- leave `SOULMASK_RCON_ADDRESS=` blank
+- set `SOULMASK_RCON_PASSWORD` to enable RCON
+- use `docker exec` to run commands from the host or from a future manager
+
+That keeps RCON bound to `127.0.0.1` inside the container by default instead of exposing it broadly on the network.
+
+Examples:
+
+```bash
+docker exec -it soulmask soulmask-rcon help
+docker exec -it soulmask soulmask-rcon saveworld 1
+docker exec -it soulmask soulmask-rcon shutdown 60
+docker exec -it soulmask soulmask-rcon --interactive
+```
+
+For server 2:
+
+```bash
+docker exec -it soulmask-server-2 soulmask-rcon help
+```
+
+If you intentionally want network-reachable RCON outside the container, set:
+
+```bash
+SOULMASK_RCON_ADDRESS=0.0.0.0
+```
+
+and make sure you also restrict access with the Soulmask RCON IP whitelist.
+
 ## Cluster Toggle
 
 Soulmask 1.0 stores `KaiQiKuaFu` in sections `"0"`, `"1"`, and `"2"` of `GameXishu.json`.
@@ -211,3 +246,21 @@ Users do not need to edit the JSON by hand just to enable cluster transfers.
 - use different maps on server 1 and server 2
 - use the same server password on both nodes if you want the smoothest transfer flow
 - the internal cluster link stays inside the Docker network and does not need router port forwarding
+
+## Common RCON Commands
+
+The authoritative command list is `help` from the running server, because command names and aliases can change between builds.
+
+Common commands used by managers and admins include:
+
+- `help`
+- `saveworld 1`
+- `shutdown 60`
+- `cancelclose`
+- `bk my_backup_name`
+- `lp` to list online players
+- `fps` for server frame rate
+- `qi` for the invitation code
+- `lc` to list coefficient values
+- `sc <name> <value>` to change a coefficient
+- `Update_RconClientAddress 1 <ip>` to add an RCON-safe IP temporarily
