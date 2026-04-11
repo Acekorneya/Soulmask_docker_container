@@ -50,7 +50,7 @@ Edit `.env` and set at least:
 
 For a normal single server, leave:
 
-- `ENABLE_CROSSPLAY=false`
+- `ENABLE_CLUSTER=false`
 - `SOULMASK_GAME_MODE=pve` or `pvp`, whichever you want
 
 ### 2. Start the server
@@ -89,6 +89,7 @@ You do not need to manually set:
 
 - `SOULMASK_SERVER_ID`
 - `SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT`
+- any internal cluster port
 
 The compose files handle that automatically.
 
@@ -103,9 +104,8 @@ cp server_2.env.example server_2.env
 
 Set these values for the cluster:
 
-- `ENABLE_CROSSPLAY=true`
+- `ENABLE_CLUSTER=true`
 - `SOULMASK_GAME_MODE=pve`
-- `SOULMASK_CLUSTER_MAIN_SERVER_PORT=29000` or another free port
 - `SOULMASK_SERVER_PASSWORD=` and keep the same password for both maps if you use one
 - `SOULMASK_SERVER_NAME`
 - `SOULMASK_LEVEL_NAME`
@@ -128,6 +128,7 @@ You can also change:
 - server 2 optional gameplay overrides
 
 Server 2 already defaults to `AUTO_UPDATE=false` so it reuses the shared install instead of updating it directly.
+The internal cluster link port is already handled inside the compose files and does not need host port forwarding.
 
 ### 4. Start server 1 first
 
@@ -191,14 +192,14 @@ That means the game files download once, but each map keeps separate saves.
 
 If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it from the example file when possible.
 
-## Crossplay Toggle
+## Cluster Toggle
 
 Soulmask 1.0 stores `KaiQiKuaFu` in sections `"0"`, `"1"`, and `"2"` of `GameXishu.json`.
 
 The container keeps that in sync automatically:
 
-- `ENABLE_CROSSPLAY=true` writes `KaiQiKuaFu=1`
-- `ENABLE_CROSSPLAY=false` writes `KaiQiKuaFu=0`
+- `ENABLE_CLUSTER=true` writes `KaiQiKuaFu=1`
+- `ENABLE_CLUSTER=false` writes `KaiQiKuaFu=0`
 
 Users do not need to edit the JSON by hand just to enable cluster transfers.
 
@@ -209,3 +210,4 @@ Users do not need to edit the JSON by hand just to enable cluster transfers.
 - stop server 2 before server 1
 - use different maps on server 1 and server 2
 - use the same server password on both nodes if you want the smoothest transfer flow
+- the internal cluster link stays inside the Docker network and does not need router port forwarding

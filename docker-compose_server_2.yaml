@@ -14,7 +14,6 @@ services:
       SOULMASK_CONFIG_DIR: /home/pokuser/soulmask/config/server_2
       SOULMASK_CONFIG_ROOT_DIR: /home/pokuser/soulmask/config
       SOULMASK_DATA_DIR: /home/pokuser/soulmask/instances/server_2
-      SOULMASK_ENABLE_CROSSPLAY: ${ENABLE_CROSSPLAY:-false}
       SOULMASK_GAME_PORT: "8777"
       SOULMASK_QUERY_PORT: "27015"
       SOULMASK_ECHO_PORT: "18888"
@@ -23,7 +22,7 @@ services:
       SOULMASK_SHARED_DIR: /home/pokuser/soulmask/shared
       SOULMASK_STEAMCMD_DIR: /home/pokuser/soulmask/shared/steamcmd
       SOULMASK_SERVER_ID: "2"
-      SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT: soulmask-main:${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-29000}
+      SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT: soulmask-main:29000
       TZ: ${TZ:-UTC}
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'WSServer-Linux|WSServer.sh' >/dev/null || exit 1"]

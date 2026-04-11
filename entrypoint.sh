@@ -87,9 +87,9 @@ seed_gameplay_config_from_example() {
   fi
 }
 
-initialize_minimal_gameplay_config_for_crossplay() {
+initialize_minimal_gameplay_config_for_cluster() {
   local host_config_file="$1"
-  local crossplay_value="$2"
+  local cluster_value="$2"
 
   if [[ -f "$host_config_file" ]]; then
     return
@@ -98,18 +98,18 @@ initialize_minimal_gameplay_config_for_crossplay() {
   cat >"$host_config_file" <<EOF
 {
   "0": {
-    "KaiQiKuaFu": $crossplay_value
+    "KaiQiKuaFu": $cluster_value
   },
   "1": {
-    "KaiQiKuaFu": $crossplay_value
+    "KaiQiKuaFu": $cluster_value
   },
   "2": {
-    "KaiQiKuaFu": $crossplay_value
+    "KaiQiKuaFu": $cluster_value
   }
 }
 EOF
 
-  log WARN "Created a minimal gameplay config at $host_config_file to persist the crossplay toggle"
+  log WARN "Created a minimal gameplay config at $host_config_file to persist the cluster toggle"
 }
 
 sync_gameplay_config() {
@@ -133,26 +133,26 @@ sync_gameplay_config() {
   log WARN "No gameplay config found at '$host_config_file' or '$target_config_file'. Allowing the server to generate defaults."
 }
 
-set_crossplay_in_gameplay_config() {
+set_cluster_in_gameplay_config() {
   local config_file="$1"
-  local crossplay_value="$2"
+  local cluster_value="$2"
   local tmp_file=""
 
   [[ -f "$config_file" ]] || return 0
 
   tmp_file="${config_file}.tmp.$$"
 
-  if ! jq --argjson crossplay "$crossplay_value" '
-    .["0"] = ((.["0"] // {}) + {"KaiQiKuaFu": $crossplay}) |
-    .["1"] = ((.["1"] // {}) + {"KaiQiKuaFu": $crossplay}) |
-    .["2"] = ((.["2"] // {}) + {"KaiQiKuaFu": $crossplay})
+  if ! jq --argjson cluster "$cluster_value" '
+    .["0"] = ((.["0"] // {}) + {"KaiQiKuaFu": $cluster}) |
+    .["1"] = ((.["1"] // {}) + {"KaiQiKuaFu": $cluster}) |
+    .["2"] = ((.["2"] // {}) + {"KaiQiKuaFu": $cluster})
   ' "$config_file" >"$tmp_file"; then
     rm -f "$tmp_file"
     die "Failed to update KaiQiKuaFu in $config_file"
   fi
 
   mv -f "$tmp_file" "$config_file"
-  log INFO "Set KaiQiKuaFu=$crossplay_value in $config_file"
+  log INFO "Set KaiQiKuaFu=$cluster_value in $config_file"
 }
 
 seed_gameplay_config_if_missing() {
@@ -396,7 +396,7 @@ SOULMASK_BACKUP_INTERVAL_SECONDS="${SOULMASK_BACKUP_INTERVAL_SECONDS:-900}"
 SOULMASK_INIT_BACKUP="${SOULMASK_INIT_BACKUP:-false}"
 SOULMASK_LOG_ENABLED="${SOULMASK_LOG_ENABLED:-true}"
 SOULMASK_ONLINE_MODE="${SOULMASK_ONLINE_MODE:-Steam}"
-SOULMASK_ENABLE_CROSSPLAY="${SOULMASK_ENABLE_CROSSPLAY:-false}"
+SOULMASK_ENABLE_CLUSTER="${SOULMASK_ENABLE_CLUSTER:-${ENABLE_CLUSTER:-${SOULMASK_ENABLE_CROSSPLAY:-${ENABLE_CROSSPLAY:-false}}}}"
 
 export SOULMASK_APP_ID
 export SOULMASK_DATA_DIR
@@ -452,16 +452,12 @@ if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -n "${SOULMASK_CLUSTER_CLIE
   die "Set either SOULMASK_CLUSTER_MAIN_SERVER_PORT or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT, not both"
 fi
 
-if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ "$SOULMASK_GAME_MODE" != "pve" ]]; then
-  die "ENABLE_CROSSPLAY requires SOULMASK_GAME_MODE=pve. PvP cross-map clustering is not supported yet."
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ "$SOULMASK_GAME_MODE" != "pve" ]]; then
+  die "ENABLE_CLUSTER requires SOULMASK_GAME_MODE=pve. PvP cross-map clustering is not supported yet."
 fi
 
-if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -z "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -z "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
-  die "ENABLE_CROSSPLAY=true requires SOULMASK_CLUSTER_MAIN_SERVER_PORT for the main server or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT for a client server."
-fi
-
-if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" || -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]] && [[ "$SOULMASK_GAME_MODE" != "pve" ]]; then
-  die "Cluster settings currently require SOULMASK_GAME_MODE=pve. PvP cross-map clustering is not supported yet."
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -z "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -z "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
+  die "ENABLE_CLUSTER=true requires an internal cluster role. The compose files should provide this automatically."
 fi
 
 if [[ -n "${SOULMASK_RCON_PASSWORD:-}" && -z "${SOULMASK_RCON_ADDRESS:-}" ]]; then
@@ -481,22 +477,22 @@ fi
 
 HOST_GAMEPLAY_CONFIG="$SOULMASK_CONFIG_DIR/$GAMEPLAY_FILENAME"
 TARGET_GAMEPLAY_CONFIG="$SOULMASK_INSTALL_DIR/WS/Saved/GameplaySettings/$GAMEPLAY_FILENAME"
-CROSSPLAY_VALUE=0
+CLUSTER_VALUE=0
 
-if is_true "$SOULMASK_ENABLE_CROSSPLAY"; then
-  CROSSPLAY_VALUE=1
+if is_true "$SOULMASK_ENABLE_CLUSTER"; then
+  CLUSTER_VALUE=1
 fi
 
 seed_gameplay_config_from_example "$HOST_GAMEPLAY_CONFIG"
 
-if (( CROSSPLAY_VALUE == 1 )) && [[ ! -f "$HOST_GAMEPLAY_CONFIG" && ! -f "$TARGET_GAMEPLAY_CONFIG" ]]; then
-  initialize_minimal_gameplay_config_for_crossplay "$HOST_GAMEPLAY_CONFIG" "$CROSSPLAY_VALUE"
+if (( CLUSTER_VALUE == 1 )) && [[ ! -f "$HOST_GAMEPLAY_CONFIG" && ! -f "$TARGET_GAMEPLAY_CONFIG" ]]; then
+  initialize_minimal_gameplay_config_for_cluster "$HOST_GAMEPLAY_CONFIG" "$CLUSTER_VALUE"
 fi
 
 sync_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
 
 if [[ -f "$HOST_GAMEPLAY_CONFIG" ]]; then
-  set_crossplay_in_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$CROSSPLAY_VALUE"
+  set_cluster_in_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$CLUSTER_VALUE"
   cp -f "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
 fi
 
@@ -551,15 +547,15 @@ if [[ -n "${SOULMASK_RCON_PASSWORD:-}" ]]; then
   )
 fi
 
-if [[ -n "${SOULMASK_SERVER_ID:-}" ]]; then
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_SERVER_ID:-}" ]]; then
   LAUNCH_ARGS+=("-serverid=${SOULMASK_SERVER_ID}")
 fi
 
-if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
   LAUNCH_ARGS+=("-mainserverport=${SOULMASK_CLUSTER_MAIN_SERVER_PORT}")
 fi
 
-if is_true "$SOULMASK_ENABLE_CROSSPLAY" && [[ -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
+if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
   LAUNCH_ARGS+=("-clientserverconnect=${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT}")
 fi
 
@@ -585,7 +581,7 @@ log INFO "Map: $SOULMASK_LEVEL_NAME"
 log INFO "Mode: $SOULMASK_GAME_MODE"
 log INFO "Game port: $SOULMASK_GAME_PORT"
 log INFO "Query port: $SOULMASK_QUERY_PORT"
-log INFO "Crossplay enabled: $([[ "$CROSSPLAY_VALUE" -eq 1 ]] && printf yes || printf no)"
+log INFO "Cluster enabled: $([[ "$CLUSTER_VALUE" -eq 1 ]] && printf yes || printf no)"
 log INFO "RCON enabled: $([[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && printf yes || printf no)"
 
 SOULMASK_LAUNCHER_PID=""
