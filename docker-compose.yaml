@@ -30,7 +30,6 @@ services:
     ports:
       - "${SOULMASK_PUBLISHED_GAME_PORT:-8777}:${SOULMASK_GAME_PORT:-8777}/udp"
       - "${SOULMASK_PUBLISHED_QUERY_PORT:-27015}:${SOULMASK_QUERY_PORT:-27015}/udp"
-      - "${SOULMASK_PUBLISHED_RCON_PORT:-19000}:${SOULMASK_RCON_PORT:-19000}/tcp"
     networks:
       soulmask_cluster:
         aliases:

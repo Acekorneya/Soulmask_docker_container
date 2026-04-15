@@ -32,9 +32,8 @@ RUN dpkg --add-architecture i386 \
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY soulmask-health /usr/local/bin/soulmask-health
 COPY soulmask-maint /usr/local/bin/soulmask-maint
-COPY soulmask-rcon /usr/local/bin/soulmask-rcon
 
-RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/soulmask-health /usr/local/bin/soulmask-maint /usr/local/bin/soulmask-rcon
+RUN chmod 0755 /usr/local/bin/entrypoint.sh /usr/local/bin/soulmask-health /usr/local/bin/soulmask-maint
 
 WORKDIR /home/pokuser
 

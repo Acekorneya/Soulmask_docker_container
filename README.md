@@ -57,12 +57,18 @@ For a normal single server, leave:
 
 ### 2. Start the server
 
+The repo already includes the required bind-mount folders. Before first start, make sure `./shared`, `./config`, and `./instances/server_1` are owned by the same Linux user and group as `PUID` and `PGID`.
+
+Example if you use `PUID=1000` and `PGID=1000`:
+
+```bash
+sudo chown -R 1000:1000 shared config instances
+```
+
 ```bash
 docker compose pull
 docker compose up -d
 ```
-
-Docker creates the needed runtime folders under `./shared`, `./config`, and `./instances/server_1` on first start.
 
 ### 3. Watch logs
 
@@ -94,6 +100,8 @@ You do not need to manually set:
 - any internal cluster port
 
 The compose files handle that automatically.
+
+If Docker reports `Pool overlaps with other one on this address space`, the problem is the Docker subnet, not the cluster port. Change `SOULMASK_CLUSTER_SUBNET` in `.env` to an unused private `/24` and start again.
 
 ### 1. Prepare the config files
 
@@ -141,12 +149,12 @@ docker compose up -d
 
 ### 5. Start server 2 second
 
+Before first start of server 2, make sure `./instances/server_2` is owned by the same Linux user and group as `PUID` and `PGID`.
+
 ```bash
 docker compose -f docker-compose_server_2.yaml pull
 docker compose -f docker-compose_server_2.yaml up -d
 ```
-
-Docker creates the server 2 runtime folders under `./instances/server_2` on first start.
 
 ### 6. Watch logs
 
@@ -194,38 +202,28 @@ That means the game files download once, but each map keeps separate saves.
 
 If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it from the example file when possible.
 
-## RCON / Admin CLI
+## Maintenance / Admin CLI
 
-If you set `SOULMASK_RCON_PASSWORD`, the image includes a built-in `soulmask-rcon` client that you can call with `docker exec`.
+The validated admin/control path for Soulmask in this project is the maintenance port on `SOULMASK_ECHO_PORT`, using the built-in `soulmask-maint` client.
 
-Recommended setup:
-
-- leave `SOULMASK_RCON_ADDRESS=` blank
-- set `SOULMASK_RCON_PASSWORD` to enable RCON
-- use `docker exec` to run commands from the host
-
-That keeps RCON bound to `127.0.0.1` inside the container by default instead of exposing it broadly on the network.
-
-Examples:
+Use `docker exec` from the host:
 
 ```bash
-docker exec -it soulmask soulmask-rcon help
-docker exec -it soulmask soulmask-rcon --interactive
+docker exec -it soulmask soulmask-maint -t 5 help
+docker exec -it soulmask soulmask-maint -t 5 lp
+docker exec -it soulmask soulmask-maint saveworld 1
+docker exec -it soulmask soulmask-maint fps
 ```
 
 For server 2:
 
 ```bash
-docker exec -it soulmask-server-2 soulmask-rcon help
+docker exec -it soulmask-server-2 soulmask-maint -t 5 help
 ```
 
-If you intentionally want network-reachable RCON outside the container, set:
+`-t 5` is useful for commands like `help` and `lp` that may take a little longer to return output.
 
-```bash
-SOULMASK_RCON_ADDRESS=0.0.0.0
-```
-
-and make sure you also restrict access with the Soulmask RCON IP whitelist.
+If you still have old `SOULMASK_RCON_*` variables in an existing `.env`, the image now ignores them and logs a warning at startup. Use `soulmask-maint` instead.
 
 ## Graceful Shutdown
 
@@ -270,7 +268,6 @@ What the probe checks:
 - the game UDP port is listening
 - the query UDP port is listening
 - the Echo TCP port is listening
-- the RCON TCP port is listening when RCON is enabled
 - the internal cluster main TCP port is listening on server 1 when cluster mode is enabled
 
 Useful commands:
@@ -313,29 +310,27 @@ Users do not need to edit the JSON by hand just to enable cluster transfers.
 - use the same server password on both nodes if you want the smoothest transfer flow
 - the internal cluster link stays inside the Docker network and does not need router port forwarding
 
-## Common RCON Commands
+## Common Maintenance Commands
 
 The authoritative command list is `help` from the running server, because command names and aliases can change between builds.
 
-Common admin commands include:
+Common commands that are useful for manual testing and automation:
 
 - `help`
-- `saveworld 1`
-- `shutdown 60`
-- `cancelclose`
-- `bk my_backup_name`
 - `lp` to list online players
+- `lap` to list all players
+- `lg` to list guilds
+- `qi` to query the invitation code
 - `fps` for server frame rate
-- `qi` for the invitation code
-- `lc` to list coefficient values
-- `sc <name> <value>` to change a coefficient
-- `Update_RconClientAddress 1 <ip>` to add an RCON-safe IP temporarily
+- `saveworld 1` to force a save
+- `backup my_backup_name` to write a named backup
+- `shutdown 60` or `quit 60` to save and stop after a countdown
+- `cancelclose` to cancel a pending shutdown
+- `sl 0` to pause new logins
+- `sl 1` to allow logins again
 
-## Common Maintenance Port Commands
+These are the commands the built-in shutdown path depends on:
 
-These are the official Soulmask maintenance-port commands used by the shutdown path:
-
-- `help`
 - `saveworld 1`
 - `quit 30`
 

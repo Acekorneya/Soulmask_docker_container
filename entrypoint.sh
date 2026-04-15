@@ -482,7 +482,6 @@ SOULMASK_GAME_MODE="$(lower "${SOULMASK_GAME_MODE:-pve}")"
 SOULMASK_GAME_PORT="${SOULMASK_GAME_PORT:-8777}"
 SOULMASK_QUERY_PORT="${SOULMASK_QUERY_PORT:-27015}"
 SOULMASK_ECHO_PORT="${SOULMASK_ECHO_PORT:-18888}"
-SOULMASK_RCON_PORT="${SOULMASK_RCON_PORT:-19000}"
 SOULMASK_MAX_PLAYERS="${SOULMASK_MAX_PLAYERS:-50}"
 SOULMASK_LISTEN_ADDRESS="${SOULMASK_LISTEN_ADDRESS:-0.0.0.0}"
 SOULMASK_SAVE_INTERVAL_SECONDS="${SOULMASK_SAVE_INTERVAL_SECONDS:-600}"
@@ -523,7 +522,6 @@ esac
 require_integer_in_range "SOULMASK_GAME_PORT" "$SOULMASK_GAME_PORT" 1024 65535
 require_integer_in_range "SOULMASK_QUERY_PORT" "$SOULMASK_QUERY_PORT" 1024 65535
 require_integer_in_range "SOULMASK_ECHO_PORT" "$SOULMASK_ECHO_PORT" 1024 65535
-require_integer_in_range "SOULMASK_RCON_PORT" "$SOULMASK_RCON_PORT" 1 65535
 require_integer_in_range "SOULMASK_MAX_PLAYERS" "$SOULMASK_MAX_PLAYERS" 1 255
 require_integer_in_range "SOULMASK_SAVE_INTERVAL_SECONDS" "$SOULMASK_SAVE_INTERVAL_SECONDS" 1 86400
 require_integer_in_range "SOULMASK_BACKUP_INTERVAL_SECONDS" "$SOULMASK_BACKUP_INTERVAL_SECONDS" 1 86400
@@ -556,10 +554,6 @@ fi
 
 if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -z "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -z "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
   die "ENABLE_CLUSTER=true requires an internal cluster role. The compose files should provide this automatically."
-fi
-
-if [[ -n "${SOULMASK_RCON_PASSWORD:-}" && -z "${SOULMASK_RCON_ADDRESS:-}" ]]; then
-  SOULMASK_RCON_ADDRESS="127.0.0.1"
 fi
 
 if [[ -n "${UMASK:-}" ]]; then
@@ -637,14 +631,6 @@ if [[ -n "${SOULMASK_BACKUP_INTERVAL_MINUTES:-}" ]]; then
   LAUNCH_ARGS+=("-backupinterval=${SOULMASK_BACKUP_INTERVAL_MINUTES}")
 fi
 
-if [[ -n "${SOULMASK_RCON_PASSWORD:-}" ]]; then
-  LAUNCH_ARGS+=(
-    "-rconaddr=${SOULMASK_RCON_ADDRESS}"
-    "-rconport=${SOULMASK_RCON_PORT}"
-    "-rconpsw=${SOULMASK_RCON_PASSWORD}"
-  )
-fi
-
 if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_SERVER_ID:-}" ]]; then
   LAUNCH_ARGS+=("-serverid=${SOULMASK_SERVER_ID}")
 fi
@@ -680,7 +666,10 @@ log INFO "Mode: $SOULMASK_GAME_MODE"
 log INFO "Game port: $SOULMASK_GAME_PORT"
 log INFO "Query port: $SOULMASK_QUERY_PORT"
 log INFO "Cluster enabled: $([[ "$CLUSTER_VALUE" -eq 1 ]] && printf yes || printf no)"
-log INFO "RCON enabled: $([[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && printf yes || printf no)"
+
+if [[ -n "${SOULMASK_RCON_PASSWORD:-}" || -n "${SOULMASK_RCON_ADDRESS:-}" || -n "${SOULMASK_RCON_PORT:-}" ]]; then
+  log WARN "RCON settings are ignored by this image. Use the maintenance port through soulmask-maint instead."
+fi
 
 SOULMASK_LAUNCHER_PID=""
 SERVER_BINARY_PID=""

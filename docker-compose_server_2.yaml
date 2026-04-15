@@ -17,7 +17,6 @@ services:
       SOULMASK_GAME_PORT: "8777"
       SOULMASK_QUERY_PORT: "27015"
       SOULMASK_ECHO_PORT: "18888"
-      SOULMASK_RCON_PORT: "19000"
       SOULMASK_INSTALL_DIR: /home/pokuser/soulmask/shared/server
       SOULMASK_SHARED_DIR: /home/pokuser/soulmask/shared
       SOULMASK_STEAMCMD_DIR: /home/pokuser/soulmask/shared/steamcmd
@@ -33,7 +32,6 @@ services:
     ports:
       - "${SOULMASK_SERVER_2_PUBLISHED_GAME_PORT:-8778}:8777/udp"
       - "${SOULMASK_SERVER_2_PUBLISHED_QUERY_PORT:-27016}:27015/udp"
-      - "${SOULMASK_SERVER_2_PUBLISHED_RCON_PORT:-19001}:19000/tcp"
     networks:
       soulmask_cluster: {}
     stop_grace_period: 120s

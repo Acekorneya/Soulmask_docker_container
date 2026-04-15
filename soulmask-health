@@ -71,7 +71,6 @@ SOULMASK_INSTALL_DIR="${SOULMASK_INSTALL_DIR:-/home/pokuser/soulmask/shared/serv
 SOULMASK_GAME_PORT="${SOULMASK_GAME_PORT:-8777}"
 SOULMASK_QUERY_PORT="${SOULMASK_QUERY_PORT:-27015}"
 SOULMASK_ECHO_PORT="${SOULMASK_ECHO_PORT:-18888}"
-SOULMASK_RCON_PORT="${SOULMASK_RCON_PORT:-19000}"
 SOULMASK_ENABLE_CLUSTER="${SOULMASK_ENABLE_CLUSTER:-${ENABLE_CLUSTER:-${SOULMASK_ENABLE_CROSSPLAY:-${ENABLE_CROSSPLAY:-false}}}}"
 
 if ! pgrep -f 'WSServer-Linux' >/dev/null; then
@@ -96,10 +95,6 @@ fi
 
 if ! tcp_port_listening "$SOULMASK_ECHO_PORT"; then
   fail "Echo TCP port $SOULMASK_ECHO_PORT is not listening"
-fi
-
-if [[ -n "${SOULMASK_RCON_PASSWORD:-}" ]] && ! tcp_port_listening "$SOULMASK_RCON_PORT"; then
-  fail "RCON TCP port $SOULMASK_RCON_PORT is not listening"
 fi
 
 if is_true "$SOULMASK_ENABLE_CLUSTER" && [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" ]]; then
