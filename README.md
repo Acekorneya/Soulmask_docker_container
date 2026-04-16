@@ -48,6 +48,7 @@ Edit `.env` and set at least:
 - `SOULMASK_ADMIN_PASSWORD`
 - `SOULMASK_SERVER_NAME`
 - `SOULMASK_LEVEL_NAME`
+- any multiplier values you want to change from the defaults
 - optional published ports if you do not want the defaults
 
 For a normal single server, leave:
@@ -140,6 +141,9 @@ You can also change:
 Server 2 already defaults to `AUTO_UPDATE=false` so it reuses the shared install instead of updating it directly.
 The internal cluster link port is already handled inside the compose files and does not need host port forwarding.
 
+If you want different multipliers on server 2, add the same `SOULMASK_*_MULTIPLIER` variables to `server_2.env`.
+Anything not set there keeps the shared value from `.env`.
+
 ### 4. Start server 1 first
 
 ```bash
@@ -201,6 +205,43 @@ That means the game files download once, but each map keeps separate saves.
 - `config/GameXishu.json.example`
 
 If a per-instance `GameXishu.json` does not exist yet, the entrypoint seeds it from the example file when possible.
+
+## Gameplay Multipliers
+
+You do not need to edit the Chinese keys in `GameXishu.json` for the common rate settings.
+
+Set the English env vars in `.env`:
+
+- `SOULMASK_EXP_MULTIPLIER`
+- `SOULMASK_YIELD_MULTIPLIER`
+- `SOULMASK_TAMING_SPEED_MULTIPLIER`
+- `SOULMASK_HATCHING_SPEED_MULTIPLIER`
+- `SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER`
+- `SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER`
+- `SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER`
+- `SOULMASK_MAX_LOAD_MULTIPLIER`
+- `SOULMASK_INVENTORY_SLOTS_MULTIPLIER`
+
+At container startup, the entrypoint writes those values into the live file before the server launches:
+
+- server 1: `./instances/server_1/saved/GameplaySettings/GameXishu.json`
+- server 2: `./instances/server_2/saved/GameplaySettings/GameXishu.json`
+
+The image also keeps the per-instance config copy in sync under:
+
+- `config/server_1/GameXishu.json`
+- `config/server_2/GameXishu.json`
+
+Public defaults in `.env.example` match the April 2026 official-style PvE profile:
+
+- EXP: `x3`
+- Yield: `x3`
+- Taming, Hatching, Animal Growth, Crop Growth: `x1.5`
+- Training Ground XP: `x3`
+- Max Load: `x1`
+- Inventory Slots: `x1`
+
+`SOULMASK_INVENTORY_SLOTS_MULTIPLIER` uses the base 60 inventory slots and converts that multiplier into the actual slot count written into `GameXishu.json`.
 
 ## Maintenance / Admin CLI
 

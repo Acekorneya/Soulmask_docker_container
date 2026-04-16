@@ -45,6 +45,34 @@ require_integer_in_range() {
   fi
 }
 
+require_number_in_range() {
+  local name="$1"
+  local value="$2"
+  local min="$3"
+  local max="$4"
+
+  [[ "$value" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "$name must be a number. Got: $value"
+
+  if ! awk -v value="$value" -v min="$min" -v max="$max" 'BEGIN { exit(value >= min && value <= max ? 0 : 1) }'; then
+    die "$name must be between $min and $max. Got: $value"
+  fi
+}
+
+scaled_inventory_slots() {
+  local multiplier="$1"
+
+  awk -v multiplier="$multiplier" 'BEGIN {
+    slots = int((60 * multiplier) + 0.5)
+    if (slots < 30) {
+      slots = 30
+    }
+    if (slots > 256) {
+      slots = 256
+    }
+    print slots
+  }'
+}
+
 ensure_writable_dir() {
   local path="$1"
   local label="$2"
@@ -133,26 +161,63 @@ sync_gameplay_config() {
   log WARN "No gameplay config found at '$host_config_file' or '$target_config_file'. Allowing the server to generate defaults."
 }
 
-set_cluster_in_gameplay_config() {
+apply_gameplay_overrides() {
   local config_file="$1"
   local cluster_value="$2"
+  local inventory_slots="$3"
   local tmp_file=""
 
   [[ -f "$config_file" ]] || return 0
 
   tmp_file="${config_file}.tmp.$$"
 
-  if ! jq --argjson cluster "$cluster_value" '
-    .["0"] = ((.["0"] // {}) + {"KaiQiKuaFu": $cluster}) |
-    .["1"] = ((.["1"] // {}) + {"KaiQiKuaFu": $cluster}) |
-    .["2"] = ((.["2"] // {}) + {"KaiQiKuaFu": $cluster})
+  if ! jq \
+    --argjson cluster "$cluster_value" \
+    --argjson exp "$SOULMASK_EXP_MULTIPLIER" \
+    --argjson yield "$SOULMASK_YIELD_MULTIPLIER" \
+    --argjson taming "$SOULMASK_TAMING_SPEED_MULTIPLIER" \
+    --argjson hatching "$SOULMASK_HATCHING_SPEED_MULTIPLIER" \
+    --argjson animal_growth "$SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER" \
+    --argjson crop_growth "$SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER" \
+    --argjson training "$SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" \
+    --argjson max_load "$SOULMASK_MAX_LOAD_MULTIPLIER" \
+    --argjson inventory_slots "$inventory_slots" '
+    def apply_group:
+      . + {
+        "KaiQiKuaFu": $cluster,
+        "ExpRatio": $exp,
+        "ChengZhangExpRatio": $exp,
+        "MJExpRatio": $exp,
+        "ShuLianDuExpRatio": $exp,
+        "CaiJiExpRatio": $exp,
+        "ZhiZuoExpRatio": $exp,
+        "ShaGuaiExpRatio": $exp,
+        "QiTaExpRatio": $exp,
+        "CaiJiDiaoLuoRatio": $yield,
+        "FaMuDiaoLuoRatio": $yield,
+        "CaiKuangDiaoLuoRatio": $yield,
+        "DongWuShiTiDiaoLuoRatio": $yield,
+        "DongWuShiTiZhongYaoDiaoLuoRatio": $yield,
+        "CaiJiShengChanJianZhuDiaoLuoRatio": $yield,
+        "ZuoWuDropRatio": $yield,
+        "AddRenKeDuRatio": $taming,
+        "FuHuaSpeed": $hatching,
+        "DongWuShengZhangRatio": $animal_growth,
+        "ZuoWuShengZhangRatio": $crop_growth,
+        "TrainingExpRatio": $training,
+        "MaxFuZhongRatio": $max_load,
+        "RoleBagCapacity": $inventory_slots
+      };
+    .["0"] = ((.["0"] // {}) | apply_group) |
+    .["1"] = ((.["1"] // {}) | apply_group) |
+    .["2"] = ((.["2"] // {}) | apply_group)
   ' "$config_file" >"$tmp_file"; then
     rm -f "$tmp_file"
-    die "Failed to update KaiQiKuaFu in $config_file"
+    die "Failed to update gameplay overrides in $config_file"
   fi
 
   mv -f "$tmp_file" "$config_file"
-  log INFO "Set KaiQiKuaFu=$cluster_value in $config_file"
+  log INFO "Applied cluster and English multiplier overrides in $config_file"
 }
 
 seed_gameplay_config_if_missing() {
@@ -492,6 +557,15 @@ SOULMASK_INIT_BACKUP="${SOULMASK_INIT_BACKUP:-false}"
 SOULMASK_LOG_ENABLED="${SOULMASK_LOG_ENABLED:-true}"
 SOULMASK_ONLINE_MODE="${SOULMASK_ONLINE_MODE:-Steam}"
 SOULMASK_ENABLE_CLUSTER="${SOULMASK_ENABLE_CLUSTER:-${ENABLE_CLUSTER:-${SOULMASK_ENABLE_CROSSPLAY:-${ENABLE_CROSSPLAY:-false}}}}"
+SOULMASK_EXP_MULTIPLIER="${SOULMASK_EXP_MULTIPLIER:-3}"
+SOULMASK_YIELD_MULTIPLIER="${SOULMASK_YIELD_MULTIPLIER:-3}"
+SOULMASK_TAMING_SPEED_MULTIPLIER="${SOULMASK_TAMING_SPEED_MULTIPLIER:-1.5}"
+SOULMASK_HATCHING_SPEED_MULTIPLIER="${SOULMASK_HATCHING_SPEED_MULTIPLIER:-1.5}"
+SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER="${SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER:-1.5}"
+SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER="${SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER:-1.5}"
+SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER="${SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER:-3}"
+SOULMASK_MAX_LOAD_MULTIPLIER="${SOULMASK_MAX_LOAD_MULTIPLIER:-1}"
+SOULMASK_INVENTORY_SLOTS_MULTIPLIER="${SOULMASK_INVENTORY_SLOTS_MULTIPLIER:-1}"
 
 export SOULMASK_APP_ID
 export SOULMASK_DATA_DIR
@@ -544,6 +618,16 @@ if [[ -n "${SOULMASK_TRIBE_MAX_MEMBERS:-}" ]]; then
   require_integer_in_range "SOULMASK_TRIBE_MAX_MEMBERS" "$SOULMASK_TRIBE_MAX_MEMBERS" 1 2000
 fi
 
+require_number_in_range "SOULMASK_EXP_MULTIPLIER" "$SOULMASK_EXP_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_YIELD_MULTIPLIER" "$SOULMASK_YIELD_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_TAMING_SPEED_MULTIPLIER" "$SOULMASK_TAMING_SPEED_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_HATCHING_SPEED_MULTIPLIER" "$SOULMASK_HATCHING_SPEED_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER" "$SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER" "$SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" "$SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_MAX_LOAD_MULTIPLIER" "$SOULMASK_MAX_LOAD_MULTIPLIER" 0.1 100
+require_number_in_range "SOULMASK_INVENTORY_SLOTS_MULTIPLIER" "$SOULMASK_INVENTORY_SLOTS_MULTIPLIER" 0.1 100
+
 if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
   die "Set either SOULMASK_CLUSTER_MAIN_SERVER_PORT or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT, not both"
 fi
@@ -575,6 +659,8 @@ if is_true "$SOULMASK_ENABLE_CLUSTER"; then
   CLUSTER_VALUE=1
 fi
 
+GAMEPLAY_ROLE_BAG_CAPACITY="$(scaled_inventory_slots "$SOULMASK_INVENTORY_SLOTS_MULTIPLIER")"
+
 seed_gameplay_config_from_example "$HOST_GAMEPLAY_CONFIG"
 
 if (( CLUSTER_VALUE == 1 )) && [[ ! -f "$HOST_GAMEPLAY_CONFIG" && ! -f "$TARGET_GAMEPLAY_CONFIG" ]]; then
@@ -584,7 +670,7 @@ fi
 sync_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
 
 if [[ -f "$HOST_GAMEPLAY_CONFIG" ]]; then
-  set_cluster_in_gameplay_config "$HOST_GAMEPLAY_CONFIG" "$CLUSTER_VALUE"
+  apply_gameplay_overrides "$HOST_GAMEPLAY_CONFIG" "$CLUSTER_VALUE" "$GAMEPLAY_ROLE_BAG_CAPACITY"
   cp -f "$HOST_GAMEPLAY_CONFIG" "$TARGET_GAMEPLAY_CONFIG"
 fi
 
@@ -666,6 +752,7 @@ log INFO "Mode: $SOULMASK_GAME_MODE"
 log INFO "Game port: $SOULMASK_GAME_PORT"
 log INFO "Query port: $SOULMASK_QUERY_PORT"
 log INFO "Cluster enabled: $([[ "$CLUSTER_VALUE" -eq 1 ]] && printf yes || printf no)"
+log INFO "Gameplay multipliers: EXP x$SOULMASK_EXP_MULTIPLIER, Yield x$SOULMASK_YIELD_MULTIPLIER, Taming x$SOULMASK_TAMING_SPEED_MULTIPLIER, Hatching x$SOULMASK_HATCHING_SPEED_MULTIPLIER, Animal Growth x$SOULMASK_ANIMAL_GROWTH_SPEED_MULTIPLIER, Crop Growth x$SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER, Training x$SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER, Max Load x$SOULMASK_MAX_LOAD_MULTIPLIER, Inventory x$SOULMASK_INVENTORY_SLOTS_MULTIPLIER (${GAMEPLAY_ROLE_BAG_CAPACITY} slots)"
 
 if [[ -n "${SOULMASK_RCON_PASSWORD:-}" || -n "${SOULMASK_RCON_ADDRESS:-}" || -n "${SOULMASK_RCON_PORT:-}" ]]; then
   log WARN "RCON settings are ignored by this image. Use the maintenance port through soulmask-maint instead."
