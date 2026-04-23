@@ -14,8 +14,8 @@ services:
       SOULMASK_CONFIG_DIR: /home/pokuser/soulmask/config/server_2
       SOULMASK_CONFIG_ROOT_DIR: /home/pokuser/soulmask/config
       SOULMASK_DATA_DIR: /home/pokuser/soulmask/instances/server_2
-      SOULMASK_GAME_PORT: "8777"
-      SOULMASK_QUERY_PORT: "27015"
+      SOULMASK_GAME_PORT: ${SOULMASK_SERVER_2_GAME_PORT:-8778}
+      SOULMASK_QUERY_PORT: ${SOULMASK_SERVER_2_QUERY_PORT:-27016}
       SOULMASK_ECHO_PORT: "18888"
       SOULMASK_INSTALL_DIR: /home/pokuser/soulmask/shared/server
       SOULMASK_SHARED_DIR: /home/pokuser/soulmask/shared
@@ -30,8 +30,8 @@ services:
       retries: 5
       start_period: 180s
     ports:
-      - "${SOULMASK_SERVER_2_PUBLISHED_GAME_PORT:-8778}:8777/udp"
-      - "${SOULMASK_SERVER_2_PUBLISHED_QUERY_PORT:-27016}:27015/udp"
+      - "${SOULMASK_SERVER_2_GAME_PORT:-8778}:${SOULMASK_SERVER_2_GAME_PORT:-8778}/udp"
+      - "${SOULMASK_SERVER_2_QUERY_PORT:-27016}:${SOULMASK_SERVER_2_QUERY_PORT:-27016}/udp"
     networks:
       soulmask_cluster: {}
     stop_grace_period: 120s

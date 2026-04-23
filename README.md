@@ -49,7 +49,7 @@ Edit `.env` and set at least:
 - `SOULMASK_SERVER_NAME`
 - `SOULMASK_LEVEL_NAME`
 - any multiplier values you want to change from the defaults
-- optional published ports if you do not want the defaults
+- optional game/query ports if you do not want the defaults
 
 For a normal single server, leave:
 
@@ -102,6 +102,10 @@ You do not need to manually set:
 
 The compose files handle that automatically.
 
+Each server has one game port and one query port. The compose files use the same value for the Soulmask launch port and the Docker published port.
+For example, if `SOULMASK_SERVER_2_GAME_PORT=28052` and `SOULMASK_SERVER_2_QUERY_PORT=28053`, Docker should show `28052->28052/udp` and `28053->28053/udp`.
+This matters because Soulmask and Steam advertise the ports passed to `-Port` and `-QueryPort`; NATing `28052->8777` can leave the server healthy but missing from the public list.
+
 If Docker reports `Pool overlaps with other one on this address space`, the problem is the Docker subnet, not the cluster port. Change `SOULMASK_CLUSTER_SUBNET` in `.env` to an unused private `/24` and start again.
 
 ### 1. Prepare the config files
@@ -139,7 +143,7 @@ You can also change:
 - server 2 optional gameplay overrides
 
 Server 2 already defaults to `AUTO_UPDATE=false` so it reuses the shared install instead of updating it directly.
-The internal cluster link port is already handled inside the compose files and does not need host port forwarding.
+The internal cluster link port is already handled inside the compose files and does not need host port forwarding when both containers run on the same Docker host.
 
 If you want different multipliers on server 2, add the same `SOULMASK_*_MULTIPLIER` variables to `server_2.env`.
 Anything not set there keeps the shared value from `.env`.
@@ -178,6 +182,8 @@ docker compose down
 
 - `docker-compose.yaml` is server 1 and the main cluster node
 - `docker-compose_server_2.yaml` is server 2 and the client node
+- server 1 starts with `-serverid=1 -mainserverport=29000`
+- server 2 starts with `-serverid=2 -clientserverconnect=soulmask-main:29000`
 - server 2 automatically connects to server 1 through the Docker network alias `soulmask-main`
 - both containers share one SteamCMD directory and one game install in `./shared`
 - each container keeps its own runtime files and save data in its own `./instances/server_X` folder
