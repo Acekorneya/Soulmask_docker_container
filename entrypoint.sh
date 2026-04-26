@@ -181,7 +181,32 @@ apply_gameplay_overrides() {
     --argjson crop_growth "$SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER" \
     --argjson training "$SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" \
     --argjson max_load "$SOULMASK_MAX_LOAD_MULTIPLIER" \
-    --argjson inventory_slots "$inventory_slots" '
+    --argjson inventory_slots "$inventory_slots" \
+    --arg ship_build_range_limit_enabled "${SOULMASK_SHIP_BUILD_RANGE_LIMIT_ENABLED:-}" \
+    --arg ship_building_count_limit_enabled "${SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED:-}" \
+    --arg ship_building_count_multiplier "${SOULMASK_SHIP_BUILDING_COUNT_MULTIPLIER:-}" \
+    --arg personal_ship_limit "${SOULMASK_PERSONAL_SHIP_LIMIT:-}" \
+    --arg tribe_ship_limit "${SOULMASK_TRIBE_SHIP_LIMIT:-}" \
+    --arg personal_specific_ship_limit "${SOULMASK_PERSONAL_SPECIFIC_SHIP_LIMIT:-}" \
+    --arg tribe_specific_ship_limit "${SOULMASK_TRIBE_SPECIFIC_SHIP_LIMIT:-}" \
+    --arg crafting_speed_multiplier "${SOULMASK_CRAFTING_SPEED_MULTIPLIER:-}" \
+    --arg durability_consumption_multiplier "${SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER:-}" \
+    --arg bonfire_fuel_consumption_multiplier "${SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER:-}" \
+    --arg personal_bonfire_limit "${SOULMASK_PERSONAL_BONFIRE_LIMIT:-}" \
+    --arg tribe_bonfire_limit "${SOULMASK_TRIBE_BONFIRE_LIMIT:-}" \
+    --arg tribe_recruit_limit "${SOULMASK_TRIBE_RECRUIT_LIMIT:-}" \
+    --arg personal_recruit_bonus_level_1 "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_1:-}" \
+    --arg personal_recruit_bonus_level_2 "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_2:-}" \
+    --arg personal_recruit_bonus_level_3 "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_3:-}" \
+    --arg deployed_tribesmen_limit "${SOULMASK_DEPLOYED_TRIBESMEN_LIMIT:-}" \
+    --arg building_decay_enabled "${SOULMASK_BUILDING_DECAY_ENABLED:-}" \
+    --arg building_decay_multiplier "${SOULMASK_BUILDING_DECAY_MULTIPLIER:-}" \
+    --arg building_repair_speed_multiplier "${SOULMASK_BUILDING_REPAIR_SPEED_MULTIPLIER:-}" \
+    --arg craft_from_nearby_chests_enabled "${SOULMASK_CRAFT_FROM_NEARBY_CHESTS_ENABLED:-}" '
+    def set_optional_number($key; $value):
+      if ($value | length) > 0 then . + {($key): ($value | tonumber)} else . end;
+    def set_optional_integer($key; $value):
+      if ($value | length) > 0 then . + {($key): ($value | tonumber | floor)} else . end;
     def apply_group:
       . + {
         "KaiQiKuaFu": $cluster,
@@ -207,7 +232,28 @@ apply_gameplay_overrides() {
         "TrainingExpRatio": $training,
         "MaxFuZhongRatio": $max_load,
         "RoleBagCapacity": $inventory_slots
-      };
+      }
+      | set_optional_integer("PingTaiBuildRangeLimit"; $ship_build_range_limit_enabled)
+      | set_optional_integer("PingTaiJianZhuNumLimit"; $ship_building_count_limit_enabled)
+      | set_optional_number("MaxPingTaiJianZhuNumMul"; $ship_building_count_multiplier)
+      | set_optional_integer("GeRenMaxRaftSpaceCount"; $personal_ship_limit)
+      | set_optional_integer("GongHuiMaxRaftSpaceCount"; $tribe_ship_limit)
+      | set_optional_integer("GeRenMaxSpecRaftSpaceCount"; $personal_specific_ship_limit)
+      | set_optional_integer("GongHuiMaxSpecRaftSpaceCount"; $tribe_specific_ship_limit)
+      | set_optional_number("ZhiZuoTimeRatio"; $crafting_speed_multiplier)
+      | set_optional_number("NaiJiuXiShu"; $durability_consumption_multiplier)
+      | set_optional_number("YingHuoRanShaoSuDuRatio"; $bonfire_fuel_consumption_multiplier)
+      | set_optional_integer("MaxGenRenYingHuoNumber"; $personal_bonfire_limit)
+      | set_optional_integer("MaxGongHuiYingHuoNumber"; $tribe_bonfire_limit)
+      | set_optional_integer("GongHuiMaxZhaoMuCount"; $tribe_recruit_limit)
+      | set_optional_integer("GeRenMaxZhaoMuCount"; $personal_recruit_bonus_level_1)
+      | set_optional_integer("GeRenMaxZhaoMuCount_Two"; $personal_recruit_bonus_level_2)
+      | set_optional_integer("GeRenMaxZhaoMuCount_Three"; $personal_recruit_bonus_level_3)
+      | set_optional_integer("ManRenChuZhanCount"; $deployed_tribesmen_limit)
+      | set_optional_integer("JianZhuFuLanKaiGuan"; $building_decay_enabled)
+      | set_optional_number("JianZhuFuLanMul"; $building_decay_multiplier)
+      | set_optional_number("JianZhuXiuLiMul"; $building_repair_speed_multiplier)
+      | set_optional_integer("MakeUseAroundRongQiKaiGuan"; $craft_from_nearby_chests_enabled);
     .["0"] = ((.["0"] // {}) | apply_group) |
     .["1"] = ((.["1"] // {}) | apply_group) |
     .["2"] = ((.["2"] // {}) | apply_group)
@@ -627,6 +673,90 @@ require_number_in_range "SOULMASK_CROP_GROWTH_SPEED_MULTIPLIER" "$SOULMASK_CROP_
 require_number_in_range "SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" "$SOULMASK_TRAINING_GROUND_EXP_MULTIPLIER" 0.1 100
 require_number_in_range "SOULMASK_MAX_LOAD_MULTIPLIER" "$SOULMASK_MAX_LOAD_MULTIPLIER" 0.1 100
 require_number_in_range "SOULMASK_INVENTORY_SLOTS_MULTIPLIER" "$SOULMASK_INVENTORY_SLOTS_MULTIPLIER" 0.1 100
+
+if [[ -n "${SOULMASK_SHIP_BUILD_RANGE_LIMIT_ENABLED:-}" ]]; then
+  require_integer_in_range "SOULMASK_SHIP_BUILD_RANGE_LIMIT_ENABLED" "$SOULMASK_SHIP_BUILD_RANGE_LIMIT_ENABLED" 0 1
+fi
+
+if [[ -n "${SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED:-}" ]]; then
+  require_integer_in_range "SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED" "$SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED" 0 1
+fi
+
+if [[ -n "${SOULMASK_SHIP_BUILDING_COUNT_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_SHIP_BUILDING_COUNT_MULTIPLIER" "$SOULMASK_SHIP_BUILDING_COUNT_MULTIPLIER" 0 1000
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_SHIP_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_SHIP_LIMIT" "$SOULMASK_PERSONAL_SHIP_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_TRIBE_SHIP_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_TRIBE_SHIP_LIMIT" "$SOULMASK_TRIBE_SHIP_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_SPECIFIC_SHIP_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_SPECIFIC_SHIP_LIMIT" "$SOULMASK_PERSONAL_SPECIFIC_SHIP_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_TRIBE_SPECIFIC_SHIP_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_TRIBE_SPECIFIC_SHIP_LIMIT" "$SOULMASK_TRIBE_SPECIFIC_SHIP_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_CRAFTING_SPEED_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_CRAFTING_SPEED_MULTIPLIER" "$SOULMASK_CRAFTING_SPEED_MULTIPLIER" 0 100
+fi
+
+if [[ -n "${SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER" "$SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER" 0 100
+fi
+
+if [[ -n "${SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER" "$SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER" 0 100
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_BONFIRE_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_BONFIRE_LIMIT" "$SOULMASK_PERSONAL_BONFIRE_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_TRIBE_BONFIRE_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_TRIBE_BONFIRE_LIMIT" "$SOULMASK_TRIBE_BONFIRE_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_TRIBE_RECRUIT_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_TRIBE_RECRUIT_LIMIT" "$SOULMASK_TRIBE_RECRUIT_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_1:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_1" "$SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_1" 0 1000
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_2:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_2" "$SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_2" 0 1000
+fi
+
+if [[ -n "${SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_3:-}" ]]; then
+  require_integer_in_range "SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_3" "$SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_3" 0 1000
+fi
+
+if [[ -n "${SOULMASK_DEPLOYED_TRIBESMEN_LIMIT:-}" ]]; then
+  require_integer_in_range "SOULMASK_DEPLOYED_TRIBESMEN_LIMIT" "$SOULMASK_DEPLOYED_TRIBESMEN_LIMIT" 0 1000
+fi
+
+if [[ -n "${SOULMASK_BUILDING_DECAY_ENABLED:-}" ]]; then
+  require_integer_in_range "SOULMASK_BUILDING_DECAY_ENABLED" "$SOULMASK_BUILDING_DECAY_ENABLED" 0 1
+fi
+
+if [[ -n "${SOULMASK_BUILDING_DECAY_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_BUILDING_DECAY_MULTIPLIER" "$SOULMASK_BUILDING_DECAY_MULTIPLIER" 0 100
+fi
+
+if [[ -n "${SOULMASK_BUILDING_REPAIR_SPEED_MULTIPLIER:-}" ]]; then
+  require_number_in_range "SOULMASK_BUILDING_REPAIR_SPEED_MULTIPLIER" "$SOULMASK_BUILDING_REPAIR_SPEED_MULTIPLIER" 0 100
+fi
+
+if [[ -n "${SOULMASK_CRAFT_FROM_NEARBY_CHESTS_ENABLED:-}" ]]; then
+  require_integer_in_range "SOULMASK_CRAFT_FROM_NEARBY_CHESTS_ENABLED" "$SOULMASK_CRAFT_FROM_NEARBY_CHESTS_ENABLED" 0 1
+fi
 
 if [[ -n "${SOULMASK_CLUSTER_MAIN_SERVER_PORT:-}" && -n "${SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT:-}" ]]; then
   die "Set either SOULMASK_CLUSTER_MAIN_SERVER_PORT or SOULMASK_CLUSTER_CLIENT_SERVER_CONNECT, not both"

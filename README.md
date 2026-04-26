@@ -249,6 +249,74 @@ Public defaults in `.env.example` match the April 2026 official-style PvE profil
 
 `SOULMASK_INVENTORY_SLOTS_MULTIPLIER` uses the base 60 inventory slots and converts that multiplier into the actual slot count written into `GameXishu.json`.
 
+## Optional Ship And PvE QoL Overrides
+
+The image also supports optional English env vars for Shifting Sands ship limits and a focused set of popular PvE quality-of-life settings.
+
+These are intentionally opt-in:
+
+- leave them unset to preserve the shipped `GameXishu.json` defaults
+- set them in `.env` for server 1
+- set them in `server_2.env` to override server 2 only
+
+At startup, the entrypoint applies any set values to sections `"0"`, `"1"`, and `"2"` of the live `GameXishu.json`.
+
+### Shifting Sands Ship Settings
+
+Use these to control ship-platform build restrictions and raft-space limits introduced with the Shifting Sands DLC:
+
+- `SOULMASK_SHIP_BUILD_RANGE_LIMIT_ENABLED`
+- `SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED`
+- `SOULMASK_SHIP_BUILDING_COUNT_MULTIPLIER`
+- `SOULMASK_PERSONAL_SHIP_LIMIT`
+- `SOULMASK_TRIBE_SHIP_LIMIT`
+- `SOULMASK_PERSONAL_SPECIFIC_SHIP_LIMIT`
+- `SOULMASK_TRIBE_SPECIFIC_SHIP_LIMIT`
+
+To remove the common ship build-piece cap while keeping every other ship value unchanged, set:
+
+```bash
+SOULMASK_SHIP_BUILDING_COUNT_LIMIT_ENABLED=0
+```
+
+### Popular PvE / QoL Settings
+
+The most commonly requested non-rate overrides exposed by this image are:
+
+- `SOULMASK_CRAFTING_SPEED_MULTIPLIER`
+- `SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER`
+- `SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER`
+- `SOULMASK_PERSONAL_BONFIRE_LIMIT`
+- `SOULMASK_TRIBE_BONFIRE_LIMIT`
+- `SOULMASK_TRIBE_RECRUIT_LIMIT`
+- `SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_1`
+- `SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_2`
+- `SOULMASK_PERSONAL_RECRUIT_BONUS_LEVEL_3`
+- `SOULMASK_DEPLOYED_TRIBESMEN_LIMIT`
+- `SOULMASK_BUILDING_DECAY_ENABLED`
+- `SOULMASK_BUILDING_DECAY_MULTIPLIER`
+- `SOULMASK_BUILDING_REPAIR_SPEED_MULTIPLIER`
+- `SOULMASK_CRAFT_FROM_NEARBY_CHESTS_ENABLED`
+
+Example snippets:
+
+```bash
+# Faster crafting
+SOULMASK_CRAFTING_SPEED_MULTIPLIER=2
+
+# Slower gear wear
+SOULMASK_DURABILITY_CONSUMPTION_MULTIPLIER=0.75
+
+# Longer-lasting bonfires
+SOULMASK_BONFIRE_FUEL_CONSUMPTION_MULTIPLIER=0.75
+
+# Larger tribe recruit cap
+SOULMASK_TRIBE_RECRUIT_LIMIT=75
+
+# Allow more deployed tribesmen
+SOULMASK_DEPLOYED_TRIBESMEN_LIMIT=3
+```
+
 ## Maintenance / Admin CLI
 
 The validated admin/control path for Soulmask in this project is the maintenance port on `SOULMASK_ECHO_PORT`, using the built-in `soulmask-maint` client.
